@@ -18,14 +18,16 @@ type Location struct {
 	Href string `xml:"href,attr"`
 }
 
+const repomdLocation = "/repodata/repomd.xml"
+
 // Get downloads one repo and returns its metadata
 func Get(url string, storage *Storage) (repo map[string]string, err error) {
-	resp, err := http.Get(url + "/repodata/repomd.xml")
+	resp, err := http.Get(url + repomdLocation)
 	if err != nil {
 		return
 	}
 
-	storingReader, err := storage.NewStoringReader("/repodata/repomd.xml", resp.Body)
+	storingReader, err := storage.NewStoringReader(repomdLocation, resp.Body)
 	if err != nil {
 		return
 	}
