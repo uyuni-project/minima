@@ -19,14 +19,19 @@ type Location struct {
 }
 
 // Get downloads one repo and returns its metadata
-func Get(url string) (repo map[string]string, err error) {
+func Get(url string, storage *Storage) (repo map[string]string, err error) {
 	resp, err := http.Get(url + "/repodata/repomd.xml")
 	if err != nil {
 		return
 	}
 
-	defer resp.Body.Close()
-	decoder := xml.NewDecoder(resp.Body)
+	storingReader, err := storage.NewStoringReader("/repodata/repomd.xml", resp.Body)
+	if err != nil {
+		return
+	}
+	defer storingReader.Close()
+
+	decoder := xml.NewDecoder(storingReader)
 	var repomd Repomd
 	err = decoder.Decode(&repomd)
 

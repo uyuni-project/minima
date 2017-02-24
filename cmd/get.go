@@ -19,7 +19,8 @@ var getCmd = &cobra.Command{
 		for i := 0; i < len(args); i++ {
 			url := args[i]
 			log.Println("Processing " + url + "...")
-			resp, err := get.Get(url)
+			storage := get.NewStorage("/tmp")
+			resp, err := get.Get(url, storage)
 			if err != nil {
 				log.Println("ERROR: " + err.Error())
 				status = 1
