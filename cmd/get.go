@@ -9,26 +9,34 @@ import (
 	"github.com/moio/minima/get"
 )
 
+type argumentError struct {
+	s string
+}
+
+func (c argumentError) Error() string {
+	return c.s
+}
+
 // getCmd represents the get command
 var getCmd = &cobra.Command{
 	Use:   "get [URL]",
 	Short: "Downloads a repo",
 	Long:  `Downloads a repository given its URL`,
-	Run: func(cmd *cobra.Command, args []string) {
-		status := 0
-		for i := 0; i < len(args); i++ {
-			url := args[i]
-			log.Println("Processing " + url + "...")
-			storage := get.NewStorage("/tmp")
-			resp, err := get.Get(url, storage)
-			if err != nil {
-				log.Println("ERROR: " + err.Error())
-				status = 1
-			} else {
-				log.Println(resp)
-			}
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return argumentError{"Please specify one repo URL"}
 		}
-		os.Exit(status)
+		url := args[0]
+		log.Println("Processing " + url + "...")
+		storage := get.NewStorage("/tmp")
+		resp, err := get.Get(url, storage)
+		if err != nil {
+			log.Println("ERROR: " + err.Error())
+			os.Exit(1)
+		} else {
+			log.Println(resp)
+		}
+		return nil
 	},
 }
 
