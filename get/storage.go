@@ -19,7 +19,14 @@ func NewStorage(directory string) *Storage {
 
 // NewStoringReader returns a reader that will also store any read data to filename
 func (s *Storage) NewStoringReader(filename string, reader io.ReadCloser) (result io.ReadCloser, err error) {
-	file, err := os.Create(path.Join(s.directory, filename))
+	fullPath := path.Join(s.directory, filename)
+	// attempt to create any missing directories in the full path
+	err = os.MkdirAll(path.Dir(fullPath), os.ModePerm)
+	if err != nil {
+		return
+	}
+
+	file, err := os.Create(fullPath)
 	if err != nil {
 		return
 	}
