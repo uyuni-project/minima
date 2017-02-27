@@ -1,27 +1,68 @@
 package get
 
 import (
+	"compress/gzip"
 	"encoding/xml"
 	"io"
+	"log"
 )
 
+// common
+
+// Location maps a <location> tag in repodata/repomd.xml or repodata/<ID>-primary.xml.gz
+type Location struct {
+	Href string `xml:"href,attr"`
+}
+
+// repodata/repomd.xml
+
+// Repomd maps a <repomd> tag in repodata/repomd.xml
 type Repomd struct {
 	Data []Data `xml:"data"`
 }
 
+// Data maps a <data> tag in repodata/repomd.xml
 type Data struct {
 	Type     string   `xml:"type,attr"`
 	Location Location `xml:"location"`
 }
 
-type Location struct {
-	Href string `xml:"href,attr"`
+// repodata/<ID>-primary.xml.gz
+
+// Metadata maps a <metadata> tag in repodata/<ID>-primary.xml.gz
+type Metadata struct {
+	Packages []Package `xml:"package"`
 }
 
-const repomdLocation = "/repodata/repomd.xml"
+// Package maps a <package> tag in repodata/<ID>-primary.xml.gz
+type Package struct {
+	Location Location `xml:"location"`
+}
 
-// Stores a repo metadata files
-func StoreMetadata(url string, storage *Storage) (err error) {
+const repomdPath = "/repodata/repomd.xml"
+
+// Stores a repo
+func StoreRepo(url string, storage *Storage) (err error) {
+	packagePaths, err := processMetadata(url, storage)
+	if err != nil {
+		return
+	}
+
+	log.Printf("Downloading %v packages...\n", len(packagePaths))
+	for i := 0; i < len(packagePaths); i++ {
+		packagePath := packagePaths[i]
+		log.Printf("...%v\n", packagePath)
+		err = Store(url+"/"+packagePath, storage, packagePath)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// processMetadata stores the repo metadata and returns a list of package file
+// paths to download
+func processMetadata(url string, storage *Storage) (packagePaths []string, err error) {
 	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
 		decoder := xml.NewDecoder(r)
 		var repomd Repomd
@@ -32,13 +73,44 @@ func StoreMetadata(url string, storage *Storage) (err error) {
 
 		data := repomd.Data
 		for i := 0; i < len(data); i++ {
-			href := data[i].Location.Href
-			err = Store(url+"/"+href, storage, href)
+			metadataPath := data[i].Location.Href
+			metadataUrl := url + "/" + metadataPath
+			if data[i].Type == "primary" {
+				packagePaths, err = processPrimary(metadataUrl, storage, metadataPath)
+			} else {
+				err = Store(metadataUrl, storage, metadataPath)
+			}
 			if err != nil {
 				return
 			}
 		}
 		return
-	}, url+repomdLocation, storage, repomdLocation)
+	}, url+repomdPath, storage, repomdPath)
+	return
+}
+
+// processPrimary stores the primary XML metadata file and returns a list of
+// package file paths to download
+func processPrimary(url string, storage *Storage, path string) (packagePaths []string, err error) {
+	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
+		gzReader, err := gzip.NewReader(r)
+		if err != nil {
+			return
+		}
+		defer gzReader.Close()
+
+		decoder := xml.NewDecoder(gzReader)
+		var primary Metadata
+		err = decoder.Decode(&primary)
+		if err != nil {
+			return
+		}
+
+		packages := primary.Packages
+		for i := 0; i < len(packages); i++ {
+			packagePaths = append(packagePaths, packages[i].Location.Href)
+		}
+		return
+	}, url, storage, path)
 	return
 }
