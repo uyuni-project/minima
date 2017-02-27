@@ -23,7 +23,7 @@ type XmlRepomd struct {
 
 // XmlData maps a <data> tag in repodata/repomd.xml
 type XmlData struct {
-	Type     string   `xml:"type,attr"`
+	Type     string      `xml:"type,attr"`
 	Location XmlLocation `xml:"location"`
 }
 
@@ -36,24 +36,49 @@ type XmlMetadata struct {
 
 // XmlPackage maps a <package> tag in repodata/<ID>-primary.xml.gz
 type XmlPackage struct {
-	Arch     string   `xml:"arch"`
+	Arch     string      `xml:"arch"`
 	Location XmlLocation `xml:"location"`
+	Checksum XmlChecksum `xml:"checksum"`
+}
+
+// XmlChecksum maps a <checksum> tag in repodata/<ID>-primary.xml.gz
+type XmlChecksum struct {
+	Type     string `xml:"type,attr"`
+	Checksum string `xml:",cdata"`
+}
+
+type ChecksumType int
+
+const (
+	SHA1 ChecksumType = iota
+	SHA256
+)
+
+type PackageFile struct {
+	Path         string
+	Checksum     string
+	ChecksumType ChecksumType
+}
+
+var checksumTypeMap = map[string]ChecksumType{
+	"sha":    SHA1,
+	"sha1":   SHA1,
+	"sha256": SHA256,
 }
 
 const repomdPath = "/repodata/repomd.xml"
 
 // Stores a repo
 func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) {
-	packagePaths, err := processMetadata(url, storage, archs)
+	files, err := processMetadata(url, storage, archs)
 	if err != nil {
 		return
 	}
 
-	log.Printf("Downloading %v packages...\n", len(packagePaths))
-	for i := 0; i < len(packagePaths); i++ {
-		packagePath := packagePaths[i]
-		log.Printf("...%v\n", packagePath)
-		err = Store(url+"/"+packagePath, storage, packagePath)
+	log.Printf("Downloading %v packages...\n", len(files))
+	for _, file := range files {
+		log.Printf("...%v\n", file.Path)
+		err = Store(url+"/"+file.Path, storage, file.Path)
 		if err != nil {
 			return
 		}
@@ -63,7 +88,7 @@ func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) 
 
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
-func processMetadata(url string, storage *Storage, archs map[string]bool) (packagePaths []string, err error) {
+func processMetadata(url string, storage *Storage, archs map[string]bool) (files []PackageFile, err error) {
 	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
 		decoder := xml.NewDecoder(r)
 		var repomd XmlRepomd
@@ -77,7 +102,7 @@ func processMetadata(url string, storage *Storage, archs map[string]bool) (packa
 			metadataPath := data[i].Location.Href
 			metadataUrl := url + "/" + metadataPath
 			if data[i].Type == "primary" {
-				packagePaths, err = processPrimary(metadataUrl, storage, metadataPath, archs)
+				files, err = processPrimary(metadataUrl, storage, metadataPath, archs)
 			} else {
 				err = Store(metadataUrl, storage, metadataPath)
 			}
@@ -92,7 +117,7 @@ func processMetadata(url string, storage *Storage, archs map[string]bool) (packa
 
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
-func processPrimary(url string, storage *Storage, path string, archs map[string]bool) (packagePaths []string, err error) {
+func processPrimary(url string, storage *Storage, path string, archs map[string]bool) (files []PackageFile, err error) {
 	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
 		gzReader, err := gzip.NewReader(r)
 		if err != nil {
@@ -110,7 +135,8 @@ func processPrimary(url string, storage *Storage, path string, archs map[string]
 		archCount := len(archs)
 		for _, pack := range primary.Packages {
 			if archCount == 0 || archs[pack.Arch] {
-				packagePaths = append(packagePaths, pack.Location.Href)
+				log.Println(pack.Checksum)
+				files = append(files, PackageFile{pack.Location.Href, pack.Checksum.Checksum, checksumTypeMap[pack.Checksum.Type]})
 			}
 		}
 		return
