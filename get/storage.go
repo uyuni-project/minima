@@ -3,6 +3,7 @@ package get
 import (
 	"bufio"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 )
@@ -52,6 +53,7 @@ func (t *storingReader) Read(p []byte) (n int, err error) {
 
 // Closes the internal reader and flushes the writer
 func (t *storingReader) Close() (err error) {
+	ioutil.ReadAll(t.teeReader)
 	err = t.reader.Close()
 	if err != nil {
 		return
