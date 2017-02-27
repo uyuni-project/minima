@@ -36,14 +36,15 @@ type Metadata struct {
 
 // Package maps a <package> tag in repodata/<ID>-primary.xml.gz
 type Package struct {
+	Arch     string   `xml:"arch"`
 	Location Location `xml:"location"`
 }
 
 const repomdPath = "/repodata/repomd.xml"
 
 // Stores a repo
-func StoreRepo(url string, storage *Storage) (err error) {
-	packagePaths, err := processMetadata(url, storage)
+func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) {
+	packagePaths, err := processMetadata(url, storage, archs)
 	if err != nil {
 		return
 	}
@@ -62,7 +63,7 @@ func StoreRepo(url string, storage *Storage) (err error) {
 
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
-func processMetadata(url string, storage *Storage) (packagePaths []string, err error) {
+func processMetadata(url string, storage *Storage, archs map[string]bool) (packagePaths []string, err error) {
 	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
 		decoder := xml.NewDecoder(r)
 		var repomd Repomd
@@ -76,7 +77,7 @@ func processMetadata(url string, storage *Storage) (packagePaths []string, err e
 			metadataPath := data[i].Location.Href
 			metadataUrl := url + "/" + metadataPath
 			if data[i].Type == "primary" {
-				packagePaths, err = processPrimary(metadataUrl, storage, metadataPath)
+				packagePaths, err = processPrimary(metadataUrl, storage, metadataPath, archs)
 			} else {
 				err = Store(metadataUrl, storage, metadataPath)
 			}
@@ -91,7 +92,7 @@ func processMetadata(url string, storage *Storage) (packagePaths []string, err e
 
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
-func processPrimary(url string, storage *Storage, path string) (packagePaths []string, err error) {
+func processPrimary(url string, storage *Storage, path string, archs map[string]bool) (packagePaths []string, err error) {
 	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
 		gzReader, err := gzip.NewReader(r)
 		if err != nil {
@@ -106,9 +107,11 @@ func processPrimary(url string, storage *Storage, path string) (packagePaths []s
 			return
 		}
 
-		packages := primary.Packages
-		for i := 0; i < len(packages); i++ {
-			packagePaths = append(packagePaths, packages[i].Location.Href)
+		archCount := len(archs)
+		for _, pack := range primary.Packages {
+			if archCount == 0 || archs[pack.Arch] {
+				packagePaths = append(packagePaths, pack.Location.Href)
+			}
 		}
 		return
 	}, url, storage, path)

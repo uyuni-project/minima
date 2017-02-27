@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -11,6 +12,7 @@ import (
 )
 
 var directory string
+var archString string
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
@@ -22,9 +24,16 @@ var getCmd = &cobra.Command{
 			return errors.New("Please specify one repo URL")
 		}
 		url := args[0]
+		archs := make(map[string]bool)
+		if archString != "all" {
+			archStrings := strings.Split(archString, ",")
+			for _, arch := range archStrings {
+				archs[arch] = true
+			}
+		}
 		log.Println("Processing " + url + "...")
 		storage := get.NewStorage(directory)
-		err := get.StoreRepo(url, storage)
+		err := get.StoreRepo(url, storage, archs)
 		if err != nil {
 			log.Println("ERROR: " + err.Error())
 			os.Exit(1)
@@ -38,4 +47,5 @@ var getCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(getCmd)
 	getCmd.Flags().StringVarP(&directory, "directory", "d", ".", "Destination directory to save the repo")
+	getCmd.Flags().StringVarP(&archString, "archs", "a", "all", "Comma-separated list of archs to include")
 }
