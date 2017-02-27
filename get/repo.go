@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"io"
 	"log"
+	"sort"
 )
 
 // common
@@ -113,6 +114,7 @@ func processPrimary(url string, storage *Storage, path string, archs map[string]
 				packagePaths = append(packagePaths, pack.Location.Href)
 			}
 		}
+		sort.Strings(packagePaths)
 		return
 	}, url, storage, path)
 	return
