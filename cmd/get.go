@@ -31,12 +31,12 @@ var getCmd = &cobra.Command{
 		url := args[0]
 		log.Println("Processing " + url + "...")
 		storage := get.NewStorage(directory)
-		resp, err := get.StoreMetadata(url, storage)
+		err := get.StoreMetadata(url, storage)
 		if err != nil {
 			log.Println("ERROR: " + err.Error())
 			os.Exit(1)
 		} else {
-			log.Println(resp)
+			log.Println("Done.")
 		}
 		return nil
 	},

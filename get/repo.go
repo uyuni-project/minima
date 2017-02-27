@@ -21,8 +21,8 @@ type Location struct {
 const repomdLocation = "/repodata/repomd.xml"
 
 // Stores a repo metadata files
-func StoreMetadata(url string, storage *Storage) (result map[string]string, err error) {
-	rawResult, err := ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
+func StoreMetadata(url string, storage *Storage) (err error) {
+	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
 		decoder := xml.NewDecoder(r)
 		var repomd Repomd
 		err = decoder.Decode(&repomd)
@@ -31,17 +31,16 @@ func StoreMetadata(url string, storage *Storage) (result map[string]string, err 
 		}
 
 		data := repomd.Data
-		metadata := make(map[string]string)
 		for i := 0; i < len(data); i++ {
-			metadata[data[i].Type] = data[i].Location.Href
+      href := data[i].Location.Href
+			_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
+        return
+      }, url + "/" + href, storage, href)
+      if err != nil {
+        return
+      }
 		}
-		result = metadata
 		return
 	}, url + repomdLocation, storage, repomdLocation)
-	if err != nil {
-		return
-	}
-
-	result = rawResult.(map[string]string)
-	return
+  return
 }
