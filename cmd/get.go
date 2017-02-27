@@ -9,6 +9,8 @@ import (
 	"github.com/moio/minima/get"
 )
 
+var directory string
+
 type argumentError struct {
 	s string
 }
@@ -42,4 +44,5 @@ var getCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(getCmd)
+	getCmd.Flags().StringVarP(&directory, "directory", "d", ".", "Destination directory to save the repo")
 }

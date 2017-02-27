@@ -9,7 +9,6 @@ import (
 )
 
 var cfgFile string
-var directory string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -31,7 +30,6 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.minima.yaml)")
-	RootCmd.PersistentFlags().StringVarP(&directory, "directory", "d", ".", "Destination directory to save the repo")
 }
 
 // initConfig reads in config file and ENV variables if set.
