@@ -32,15 +32,13 @@ func StoreMetadata(url string, storage *Storage) (err error) {
 
 		data := repomd.Data
 		for i := 0; i < len(data); i++ {
-      href := data[i].Location.Href
-			_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
-        return
-      }, url + "/" + href, storage, href)
-      if err != nil {
-        return
-      }
+			href := data[i].Location.Href
+			err = Store(url+"/"+href, storage, href)
+			if err != nil {
+				return
+			}
 		}
 		return
-	}, url + repomdLocation, storage, repomdLocation)
-  return
+	}, url+repomdLocation, storage, repomdLocation)
+	return
 }

@@ -8,6 +8,11 @@ import (
 // Function maps a Reader to some other object
 type Function func(io.ReadCloser) (result interface{}, err error)
 
+// nop maps a Reader to nothing
+func nop(r io.ReadCloser) (result interface{}, err error) {
+	return
+}
+
 // Apply applies a Function on data grabbed from an URL
 func Apply(f Function, url string) (result interface{}, err error) {
 	resp, err := http.Get(url)
@@ -32,4 +37,10 @@ func ApplyStoring(f Function, url string, store *Storage, path string) (result i
 		result, err = f(sr)
 		return
 	}, url)
+}
+
+// Store saves data from an url in a storage object
+func Store(url string, store *Storage, path string) (err error) {
+	_, err = ApplyStoring(nop, url, store, path)
+	return
 }
