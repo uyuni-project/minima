@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"log"
 	"os"
 
@@ -11,14 +12,6 @@ import (
 
 var directory string
 
-type argumentError struct {
-	s string
-}
-
-func (c argumentError) Error() string {
-	return c.s
-}
-
 // getCmd represents the get command
 var getCmd = &cobra.Command{
 	Use:   "get [URL]",
@@ -26,7 +19,7 @@ var getCmd = &cobra.Command{
 	Long:  `Downloads a repository given its URL`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
-			return argumentError{"Please specify one repo URL"}
+			return errors.New("Please specify one repo URL")
 		}
 		url := args[0]
 		log.Println("Processing " + url + "...")
