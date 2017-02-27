@@ -2,10 +2,22 @@ package get
 
 import (
 	"bufio"
+	"crypto/sha1"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
+)
+
+type ChecksumType int
+
+const (
+	SHA1 ChecksumType = iota
+	SHA256
 )
 
 // Storage allows to store data in a local directory
@@ -16,6 +28,46 @@ type Storage struct {
 // NewStorage returns a new Storage given a local directory
 func NewStorage(directory string) *Storage {
 	return &Storage{directory}
+}
+
+// FileExists returns a flag whether the file exists or not on the storage
+func (s *Storage) FileExists(filename string) (fileExists bool) {
+	fullPath := path.Join(s.directory, filename)
+	file, err := os.Stat(fullPath)
+	if os.IsNotExist(err) || file == nil {
+		log.Printf("...package '%v' does not exists\n", fullPath)
+		return false
+	}
+	return true
+}
+
+// Checksum returns the checksum value of a file,
+// the algorithm to evaluate it depends on the checksumType parameter
+func (s *Storage) Checksum(filename string, checksumType ChecksumType) (checksum string, err error) {
+	fullPath := path.Join(s.directory, filename)
+	f, err := os.Open(fullPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	switch checksumType {
+	case SHA1:
+		h := sha1.New()
+		if _, err := io.Copy(h, f); err != nil {
+			log.Fatal(err)
+		}
+		checksum = hex.EncodeToString(h.Sum(nil))
+	case SHA256:
+		h := sha256.New()
+		if _, err := io.Copy(h, f); err != nil {
+			log.Fatal(err)
+		}
+		checksum = hex.EncodeToString(h.Sum(nil))
+	default:
+		err = errors.New("Unknown ChecksumType")
+	}
+	return
 }
 
 // NewStoringReader returns a reader that will also store any read data to filename

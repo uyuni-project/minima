@@ -47,13 +47,6 @@ type XmlChecksum struct {
 	Checksum string `xml:",cdata"`
 }
 
-type ChecksumType int
-
-const (
-	SHA1 ChecksumType = iota
-	SHA256
-)
-
 type PackageFile struct {
 	Path         string
 	Checksum     string
@@ -135,8 +128,23 @@ func processPrimary(url string, storage *Storage, path string, archs map[string]
 		archCount := len(archs)
 		for _, pack := range primary.Packages {
 			if archCount == 0 || archs[pack.Arch] {
-				log.Println(pack.Checksum)
-				files = append(files, PackageFile{pack.Location.Href, pack.Checksum.Checksum, checksumTypeMap[pack.Checksum.Type]})
+				if !storage.FileExists(pack.Location.Href) {
+					log.Printf("...package '%v' not found, I will download it\n", pack.Location.Href)
+					files = append(files, PackageFile{pack.Location.Href, pack.Checksum.Checksum, checksumTypeMap[pack.Checksum.Type]})
+				} else {
+					storageChecksum, err := storage.Checksum(pack.Location.Href, checksumTypeMap[pack.Checksum.Type])
+					if err != nil {
+						log.Printf("Checksum evaluation of the package '%v' returned the following error:\n", pack.Location.Href)
+						log.Printf("Error message: %v\n", err)
+						log.Println("...package skipped")
+					} else if pack.Checksum.Checksum != storageChecksum {
+						log.Printf("...package '%v' has a checksum error!!\n", pack.Location.Href)
+						log.Printf("[repo vs local] = ['%v' VS '%v']\n", pack.Checksum.Checksum, storageChecksum)
+						files = append(files, PackageFile{pack.Location.Href, pack.Checksum.Checksum, checksumTypeMap[pack.Checksum.Type]})
+					} else {
+						log.Printf("...package '%v' is up-to-date\n", pack.Location.Href)
+					}
+				}
 			}
 		}
 		return
