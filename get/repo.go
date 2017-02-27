@@ -10,35 +10,35 @@ import (
 
 // common
 
-// Location maps a <location> tag in repodata/repomd.xml or repodata/<ID>-primary.xml.gz
-type Location struct {
+// XmlLocation maps a <location> tag in repodata/repomd.xml or repodata/<ID>-primary.xml.gz
+type XmlLocation struct {
 	Href string `xml:"href,attr"`
 }
 
 // repodata/repomd.xml
 
-// Repomd maps a <repomd> tag in repodata/repomd.xml
-type Repomd struct {
-	Data []Data `xml:"data"`
+// XmlRepomd maps a <repomd> tag in repodata/repomd.xml
+type XmlRepomd struct {
+	Data []XmlData `xml:"data"`
 }
 
-// Data maps a <data> tag in repodata/repomd.xml
-type Data struct {
+// XmlData maps a <data> tag in repodata/repomd.xml
+type XmlData struct {
 	Type     string   `xml:"type,attr"`
-	Location Location `xml:"location"`
+	Location XmlLocation `xml:"location"`
 }
 
 // repodata/<ID>-primary.xml.gz
 
-// Metadata maps a <metadata> tag in repodata/<ID>-primary.xml.gz
-type Metadata struct {
-	Packages []Package `xml:"package"`
+// XmlMetadata maps a <metadata> tag in repodata/<ID>-primary.xml.gz
+type XmlMetadata struct {
+	Packages []XmlPackage `xml:"package"`
 }
 
-// Package maps a <package> tag in repodata/<ID>-primary.xml.gz
-type Package struct {
+// XmlPackage maps a <package> tag in repodata/<ID>-primary.xml.gz
+type XmlPackage struct {
 	Arch     string   `xml:"arch"`
-	Location Location `xml:"location"`
+	Location XmlLocation `xml:"location"`
 }
 
 const repomdPath = "/repodata/repomd.xml"
@@ -67,7 +67,7 @@ func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) 
 func processMetadata(url string, storage *Storage, archs map[string]bool) (packagePaths []string, err error) {
 	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
 		decoder := xml.NewDecoder(r)
-		var repomd Repomd
+		var repomd XmlRepomd
 		err = decoder.Decode(&repomd)
 		if err != nil {
 			return
@@ -102,7 +102,7 @@ func processPrimary(url string, storage *Storage, path string, archs map[string]
 		defer gzReader.Close()
 
 		decoder := xml.NewDecoder(gzReader)
-		var primary Metadata
+		var primary XmlMetadata
 		err = decoder.Decode(&primary)
 		if err != nil {
 			return
