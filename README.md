@@ -1,5 +1,22 @@
 # minima
-A Simple Linux Repository Manager
+A Simple Linux Repository Manager.
+
+Currently, it's a commandline utility to download RPM repos locally via http (mirroring).
+
+Usage:
+```
+Downloads a repository given its URL
+
+Usage:
+  minima get [URL] [flags]
+
+Flags:
+  -a, --archs string       Comma-separated list of archs to include (default "all")
+  -d, --directory string   Destination directory to save the repo (default ".")
+
+Global Flags:
+      --config string   config file (default is $HOME/.minima.yaml)
+```
 
 
 ## How to contribute
