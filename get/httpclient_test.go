@@ -2,11 +2,11 @@ package get
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"testing"
-
-	"github.com/moio/minima/util"
 )
 
 // Runs a server on http://localhost:8080/test responding with "Hello, World"
@@ -31,12 +31,17 @@ func TestGetApply(t *testing.T) {
 		t.Error(err)
 	}
 
-	result, err := GetApply("http://localhost:8080/test", util.StringReaderFunction)
+	err = GetApply("http://localhost:8080/test", func(reader io.ReadCloser) (err error) {
+		result, err := ioutil.ReadAll(reader)
+		if err != nil {
+			t.Error(err)
+		}
+		if string(result) != "Hello, World" {
+			t.Error("Unexpected value ", result)
+		}
+		return
+	})
 	if err != nil {
 		t.Error(err)
-	}
-
-	if result != "Hello, World" {
-		t.Error("Unexpected value ", result)
 	}
 }

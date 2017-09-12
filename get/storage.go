@@ -12,7 +12,7 @@ import (
 	"os"
 	"path"
 
-  "github.com/moio/minima/util"
+	"github.com/moio/minima/util"
 )
 
 type ChecksumType int
