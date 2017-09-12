@@ -23,6 +23,12 @@ func Compose(mapper ReaderMapper, f ReaderConsumer) ReaderConsumer {
 	}
 }
 
+// NopReaderConsumer is a ReaderConsumer that does nothing
+func NopReaderConsumer(reader io.ReadCloser) (err error) {
+	defer reader.Close()
+	return
+}
+
 // NopReadCloser wraps a Reader into a ReadCloser
 type NopReadCloser struct{ r io.Reader }
 

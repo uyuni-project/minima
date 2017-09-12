@@ -63,10 +63,6 @@ var checksumTypeMap = map[string]ChecksumType{
 
 const repomdPath = "/repodata/repomd.xml"
 
-func storingConsumer(s *Storage, path string) util.ReaderConsumer {
-	return util.Compose(s.NewStoringMapper(path), func(reader io.ReadCloser) (err error) { return })
-}
-
 func storingFunction(s *Storage, path string, f util.ReaderConsumer) util.ReaderConsumer {
 	return util.Compose(s.NewStoringMapper(path), f)
 }
@@ -81,7 +77,7 @@ func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) 
 	log.Printf("Downloading %v packages...\n", len(files))
 	for _, file := range files {
 		log.Printf("...%v\n", file.Path)
-		err = GetApply(url+"/"+file.Path, storingConsumer(storage, file.Path))
+		err = GetApply(url+"/"+file.Path, storingFunction(storage, file.Path, util.NopReaderConsumer))
 		if err != nil {
 			return
 		}
@@ -107,7 +103,7 @@ func processMetadata(url string, storage *Storage, archs map[string]bool) (files
 			if data[i].Type == "primary" {
 				files, err = processPrimary(metadataUrl, storage, metadataPath, archs)
 			} else {
-				err = GetApply(metadataUrl, storingConsumer(storage, metadataPath))
+				err = GetApply(metadataUrl, storingFunction(storage, metadataPath, util.NopReaderConsumer))
 			}
 			if err != nil {
 				return
