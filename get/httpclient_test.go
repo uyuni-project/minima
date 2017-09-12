@@ -1,11 +1,7 @@
 package get
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"testing"
@@ -29,34 +25,18 @@ func serveTestString() error {
 	return <-errs
 }
 
-func TestMain(m *testing.M) {
+func TestGetApply(t *testing.T) {
 	err := serveTestString()
-	if err != nil {
-		log.Fatal(err)
-	}
-	m.Run()
-}
-
-func TestApplyStoring(t *testing.T) {
-	storage := new(bytes.Buffer)
-
-	result, err := ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
-		bytes, err := ioutil.ReadAll(r)
-		result = string(bytes) + "!"
-		return
-	}, "http://localhost:8080/test", func(r io.ReadCloser) (result io.ReadCloser, err error) {
-		return util.NewNopReadCloser(io.TeeReader(r, storage)), nil
-	})
-
 	if err != nil {
 		t.Error(err)
 	}
 
-	if result != "Hello, World!" {
-		t.Error("Unexpected value ", result)
+	result, err := GetApply("http://localhost:8080/test", util.StringReaderFunction)
+	if err != nil {
+		t.Error(err)
 	}
 
-	if storage.String() != "Hello, World!" {
+	if result != "Hello, World" {
 		t.Error("Unexpected value ", result)
 	}
 }

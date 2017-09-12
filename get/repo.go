@@ -63,11 +63,11 @@ var checksumTypeMap = map[string]ChecksumType{
 
 const repomdPath = "/repodata/repomd.xml"
 
-func storingMapper(s *Storage, path string) util.ReaderMapper {
-	return func(io io.ReadCloser) (result io.ReadCloser, err error) {
-		result, err = s.NewStoringReader(path, io)
-		return
+func storingFunction(s *Storage, path string, f util.ReaderFunction) util.ReaderFunction {
+	storingMapper := func(r io.ReadCloser) (result io.ReadCloser, err error) {
+		return s.NewStoringReader(path, r)
 	}
+	return util.Compose(storingMapper, f)
 }
 
 // Stores a repo
@@ -80,7 +80,7 @@ func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) 
 	log.Printf("Downloading %v packages...\n", len(files))
 	for _, file := range files {
 		log.Printf("...%v\n", file.Path)
-		err = Store(url+"/"+file.Path, storingMapper(storage, file.Path))
+		_, err = GetApply(url+"/"+file.Path, storingFunction(storage, file.Path, util.NopReaderFunction))
 		if err != nil {
 			return
 		}
@@ -91,7 +91,7 @@ func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) 
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
 func processMetadata(url string, storage *Storage, archs map[string]bool) (files []PackageFile, err error) {
-	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
+	_, err = GetApply(url+repomdPath, storingFunction(storage, repomdPath, func(r io.ReadCloser) (result interface{}, err error) {
 		decoder := xml.NewDecoder(r)
 		var repomd XmlRepomd
 		err = decoder.Decode(&repomd)
@@ -106,21 +106,21 @@ func processMetadata(url string, storage *Storage, archs map[string]bool) (files
 			if data[i].Type == "primary" {
 				files, err = processPrimary(metadataUrl, storage, metadataPath, archs)
 			} else {
-				err = Store(metadataUrl, storingMapper(storage, metadataPath))
+				_, err = GetApply(metadataUrl, storingFunction(storage, metadataPath, util.NopReaderFunction))
 			}
 			if err != nil {
 				return
 			}
 		}
 		return
-	}, url+repomdPath, storingMapper(storage, repomdPath))
+	}))
 	return
 }
 
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
 func processPrimary(url string, storage *Storage, path string, archs map[string]bool) (files []PackageFile, err error) {
-	_, err = ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
+	_, err = GetApply(url, storingFunction(storage, path, func(r io.ReadCloser) (result interface{}, err error) {
 		gzReader, err := gzip.NewReader(r)
 		if err != nil {
 			return
@@ -157,6 +157,6 @@ func processPrimary(url string, storage *Storage, path string, archs map[string]
 			}
 		}
 		return
-	}, url, storingMapper(storage, path))
+	}))
 	return
 }

@@ -2,6 +2,7 @@ package util
 
 import (
 	"io"
+	"io/ioutil"
 )
 
 // NopReadCloser wraps a Reader into a ReadCloser
@@ -26,5 +27,28 @@ func NopReaderFunction(r io.ReadCloser) (result interface{}, err error) {
 	return
 }
 
+// StringReaderFunction maps a Reader to a string
+func StringReaderFunction(r io.ReadCloser) (result interface{}, err error) {
+	bytes, err := ioutil.ReadAll(r)
+	if err != nil {
+		return
+	}
+	result = string(bytes)
+	return
+}
+
 // ReaderMapper maps a Reader to another Reader
 type ReaderMapper func(io.ReadCloser) (result io.ReadCloser, err error)
+
+// Compose composes a ReaderFunction with a ReaderMapper, returning a new ReaderFunction
+func Compose(mapper ReaderMapper, f ReaderFunction) ReaderFunction {
+	return func(r io.ReadCloser) (result interface{}, err error) {
+		mappedReader, err := mapper(r)
+		if err != nil {
+			return
+		}
+		defer mappedReader.Close()
+
+		return f(mappedReader)
+	}
+}
