@@ -50,3 +50,32 @@ func TestApply(t *testing.T) {
 		t.Error("Unexpected value ", result)
 	}
 }
+
+type nopCloser struct{ r io.Reader }
+
+func (n *nopCloser) Read(p []byte) (n int, err error) { return n.r.Read(p) }
+func (n *nopCloser) Close() error                     { return nil }
+
+func TestApplyStoring(t *testing.T) {
+	storage := new(bytes.Buffer)
+
+	result, err := ApplyStoring(func(r io.ReadCloser) (result interface{}, err error) {
+		bytes, err := ioutil.ReadAll(r)
+		result = string(bytes) + "!"
+		return
+	}, "http://localhost:8080/test", func(r io.ReadCloser) (result io.ReadCloser, err error) {
+		return &nopCloser{io.TeeReader(r, storage)}, nil
+	})
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if result != "Hello, World!" {
+		t.Error("Unexpected value ", result)
+	}
+
+	if storage.String() != "Hello, World!" {
+		t.Error("Unexpected value ", result)
+	}
+}
