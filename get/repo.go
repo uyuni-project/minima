@@ -64,10 +64,7 @@ var checksumTypeMap = map[string]ChecksumType{
 const repomdPath = "/repodata/repomd.xml"
 
 func storingFunction(s *Storage, path string, f util.ReaderFunction) util.ReaderFunction {
-	storingMapper := func(r io.ReadCloser) (result io.ReadCloser, err error) {
-		return s.NewStoringReader(path, r)
-	}
-	return util.Compose(storingMapper, f)
+	return util.Compose(s.NewStoringMapper(path), f)
 }
 
 // Stores a repo

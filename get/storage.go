@@ -11,6 +11,8 @@ import (
 	"log"
 	"os"
 	"path"
+
+  "github.com/moio/minima/util"
 )
 
 type ChecksumType int
@@ -70,25 +72,27 @@ func (s *Storage) Checksum(filename string, checksumType ChecksumType) (checksum
 	return
 }
 
-// NewStoringReader returns a reader that will also store any read data to filename
-func (s *Storage) NewStoringReader(filename string, reader io.ReadCloser) (result io.ReadCloser, err error) {
-	fullPath := path.Join(s.directory, filename)
-	// attempt to create any missing directories in the full path
-	err = os.MkdirAll(path.Dir(fullPath), os.ModePerm)
-	if err != nil {
+// NewStoringMapper returns a mapper that will store any read data to filename
+func (s *Storage) NewStoringMapper(filename string) util.ReaderMapper {
+	return func(reader io.ReadCloser) (result io.ReadCloser, err error) {
+		fullPath := path.Join(s.directory, filename)
+		// attempt to create any missing directories in the full path
+		err = os.MkdirAll(path.Dir(fullPath), os.ModePerm)
+		if err != nil {
+			return
+		}
+
+		file, err := os.Create(fullPath)
+		if err != nil {
+			return
+		}
+
+		writer := bufio.NewWriter(file)
+		teeReader := io.TeeReader(reader, writer)
+
+		result = &storingReader{reader, writer, teeReader}
 		return
 	}
-
-	file, err := os.Create(fullPath)
-	if err != nil {
-		return
-	}
-
-	writer := bufio.NewWriter(file)
-	teeReader := io.TeeReader(reader, writer)
-
-	result = &storingReader{reader, writer, teeReader}
-	return
 }
 
 // storingReader uses a TeeReader to copy data from a reader to a writer
