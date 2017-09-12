@@ -9,6 +9,8 @@ import (
 	"net"
 	"net/http"
 	"testing"
+
+	"github.com/moio/minima/util"
 )
 
 // Runs a server on http://localhost:8080/test responding with "Hello, World"
@@ -51,11 +53,6 @@ func TestApply(t *testing.T) {
 	}
 }
 
-type nopCloser struct{ r io.Reader }
-
-func (n *nopCloser) Read(p []byte) (n int, err error) { return n.r.Read(p) }
-func (n *nopCloser) Close() error                     { return nil }
-
 func TestApplyStoring(t *testing.T) {
 	storage := new(bytes.Buffer)
 
@@ -64,7 +61,7 @@ func TestApplyStoring(t *testing.T) {
 		result = string(bytes) + "!"
 		return
 	}, "http://localhost:8080/test", func(r io.ReadCloser) (result io.ReadCloser, err error) {
-		return &nopCloser{io.TeeReader(r, storage)}, nil
+		return util.NewNopReadCloser(io.TeeReader(r, storage)), nil
 	})
 
 	if err != nil {
