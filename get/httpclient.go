@@ -1,36 +1,28 @@
 package get
 
 import (
-	"io"
 	"net/http"
 
 	"github.com/moio/minima/util"
 )
 
-// apply applies a ReaderFunction on data grabbed from an URL
-func apply(f util.ReaderFunction, url string) (result interface{}, err error) {
-	resp, err := http.Get(url)
+// ApplyStoring is like apply and also saves a copy of processed data in a
+// storage object
+func ApplyStoring(f util.ReaderFunction, url string, mapper util.ReaderMapper) (result interface{}, err error) {
+	response, err := http.Get(url)
 	if err != nil {
 		return
 	}
 
-	result, err = f(resp.Body)
-	return
-}
-
-// ApplyStoring is like apply and also saves a copy of processed data in a
-// storage object
-func ApplyStoring(f util.ReaderFunction, url string, mapper util.ReaderMapper) (result interface{}, err error) {
-	return apply(func(r io.ReadCloser) (result interface{}, err error) {
-		mappedR, err := mapper(r)
-		if err != nil {
-			return
-		}
-		defer mappedR.Close()
-
-		result, err = f(mappedR)
+	reader := response.Body
+	mappedReader, err := mapper(reader)
+	if err != nil {
 		return
-	}, url)
+	}
+	defer mappedReader.Close()
+
+	result, err = f(mappedReader)
+	return
 }
 
 // Store saves data from an url in a storage object
