@@ -5,6 +5,8 @@ import (
 	"encoding/xml"
 	"io"
 	"log"
+
+	"github.com/moio/minima/util"
 )
 
 // common
@@ -61,7 +63,7 @@ var checksumTypeMap = map[string]ChecksumType{
 
 const repomdPath = "/repodata/repomd.xml"
 
-func storingMapper(s *Storage, path string) ReaderMapper {
+func storingMapper(s *Storage, path string) util.ReaderMapper {
 	return func(io io.ReadCloser) (result io.ReadCloser, err error) {
 		result, err = s.NewStoringReader(path, io)
 		return
