@@ -37,22 +37,6 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestApply(t *testing.T) {
-	result, err := Apply(func(r io.ReadCloser) (result interface{}, err error) {
-		bytes, err := ioutil.ReadAll(r)
-		result = string(bytes) + "!"
-		return
-	}, "http://localhost:8080/test")
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	if result != "Hello, World!" {
-		t.Error("Unexpected value ", result)
-	}
-}
-
 func TestApplyStoring(t *testing.T) {
 	storage := new(bytes.Buffer)
 
