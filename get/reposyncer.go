@@ -61,11 +61,21 @@ var checksumTypeMap = map[string]ChecksumType{
 	"sha256": SHA256,
 }
 
-const repomdPath = "/repodata/repomd.xml"
+const repomdPath = "repodata/repomd.xml"
+
+type RepoSyncer struct {
+	url     string
+	archs   map[string]bool
+	storage Storage
+}
+
+func NewRepoSyncer(url string, archs map[string]bool, storage Storage) *RepoSyncer {
+	return &RepoSyncer{url, archs, storage}
+}
 
 // Stores a repo
-func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) {
-	files, err := processMetadata(url, storage, archs)
+func (r *RepoSyncer) StoreRepo() (err error) {
+	files, err := r.processMetadata()
 	if err != nil {
 		return
 	}
@@ -73,7 +83,7 @@ func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) 
 	log.Printf("Downloading %v packages...\n", len(files))
 	for _, file := range files {
 		log.Printf("...%v\n", file.Path)
-		err = downloadStoreApply(url+"/"+file.Path, storage, file.Path, util.Nop)
+		err = r.downloadStoreApply(file.Path, util.Nop)
 		if err != nil {
 			return
 		}
@@ -82,15 +92,15 @@ func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) 
 }
 
 // downloadStoreApply downloads a URL into a file, while applying a ReaderConsumer
-func downloadStoreApply(url string, storage *Storage, path string, f util.ReaderConsumer) error {
-	return DownloadApply(url, util.Compose(storage.StoringMapper(path), f))
+func (r *RepoSyncer) downloadStoreApply(path string, f util.ReaderConsumer) error {
+	return DownloadApply(r.url+"/"+path, util.Compose(r.storage.StoringMapper(path), f))
 }
 
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
-func processMetadata(url string, storage *Storage, archs map[string]bool) (files []PackageFile, err error) {
-	err = downloadStoreApply(url+repomdPath, storage, repomdPath, func(r io.ReadCloser) (err error) {
-		decoder := xml.NewDecoder(r)
+func (r *RepoSyncer) processMetadata() (files []PackageFile, err error) {
+	err = r.downloadStoreApply(repomdPath, func(reader io.ReadCloser) (err error) {
+		decoder := xml.NewDecoder(reader)
 		var repomd XmlRepomd
 		err = decoder.Decode(&repomd)
 		if err != nil {
@@ -100,11 +110,10 @@ func processMetadata(url string, storage *Storage, archs map[string]bool) (files
 		data := repomd.Data
 		for i := 0; i < len(data); i++ {
 			metadataPath := data[i].Location.Href
-			metadataUrl := url + "/" + metadataPath
 			if data[i].Type == "primary" {
-				files, err = processPrimary(metadataUrl, storage, metadataPath, archs)
+				files, err = r.processPrimary(metadataPath)
 			} else {
-				err = downloadStoreApply(metadataUrl, storage, metadataPath, util.Nop)
+				err = r.downloadStoreApply(metadataPath, util.Nop)
 			}
 			if err != nil {
 				return
@@ -117,9 +126,9 @@ func processMetadata(url string, storage *Storage, archs map[string]bool) (files
 
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
-func processPrimary(url string, storage *Storage, path string, archs map[string]bool) (files []PackageFile, err error) {
-	err = downloadStoreApply(url, storage, path, func(r io.ReadCloser) (err error) {
-		gzReader, err := gzip.NewReader(r)
+func (r *RepoSyncer) processPrimary(path string) (files []PackageFile, err error) {
+	err = r.downloadStoreApply(path, func(reader io.ReadCloser) (err error) {
+		gzReader, err := gzip.NewReader(reader)
 		if err != nil {
 			return
 		}
@@ -132,14 +141,14 @@ func processPrimary(url string, storage *Storage, path string, archs map[string]
 			return
 		}
 
-		archCount := len(archs)
+		archCount := len(r.archs)
 		for _, pack := range primary.Packages {
-			if archCount == 0 || archs[pack.Arch] {
-				if !storage.FileExists(pack.Location.Href) {
+			if archCount == 0 || r.archs[pack.Arch] {
+				if !r.storage.FileExists(pack.Location.Href) {
 					log.Printf("...package '%v' not found, I will download it\n", pack.Location.Href)
 					files = append(files, PackageFile{pack.Location.Href, pack.Checksum.Checksum, checksumTypeMap[pack.Checksum.Type]})
 				} else {
-					storageChecksum, err := storage.Checksum(pack.Location.Href, checksumTypeMap[pack.Checksum.Type])
+					storageChecksum, err := r.storage.Checksum(pack.Location.Href, checksumTypeMap[pack.Checksum.Type])
 					if err != nil {
 						log.Printf("Checksum evaluation of the package '%v' returned the following error:\n", pack.Location.Href)
 						log.Printf("Error message: %v\n", err)

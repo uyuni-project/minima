@@ -32,8 +32,9 @@ var getCmd = &cobra.Command{
 			}
 		}
 		log.Println("Processing " + url + "...")
-		storage := get.NewStorage(directory)
-		err := get.StoreRepo(url, storage, archs)
+		storage := get.NewFileStorage(directory)
+		reposyncer := get.NewRepoSyncer(url, archs, storage)
+		err := reposyncer.StoreRepo()
 		if err != nil {
 			log.Println("ERROR: " + err.Error())
 			os.Exit(1)
