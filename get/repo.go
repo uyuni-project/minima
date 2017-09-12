@@ -83,7 +83,7 @@ func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) 
 
 // downloadStoreApply downloads a URL into a file, while applying a ReaderConsumer
 func downloadStoreApply(url string, storage *Storage, path string, f util.ReaderConsumer) error {
-	return GetApply(url, util.Compose(storage.NewStoringMapper(path), f))
+	return DownloadApply(url, util.Compose(storage.StoringMapper(path), f))
 }
 
 // processMetadata stores the repo metadata and returns a list of package file

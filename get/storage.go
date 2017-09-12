@@ -72,8 +72,8 @@ func (s *Storage) Checksum(filename string, checksumType ChecksumType) (checksum
 	return
 }
 
-// NewStoringMapper returns a mapper that will store any read data to filename
-func (s *Storage) NewStoringMapper(filename string) util.ReaderMapper {
+// StoringMapper returns a mapper that will store any read data to filename
+func (s *Storage) StoringMapper(filename string) util.ReaderMapper {
 	return func(reader io.ReadCloser) (result io.ReadCloser, err error) {
 		fullPath := path.Join(s.directory, filename)
 		// attempt to create any missing directories in the full path

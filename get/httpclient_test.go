@@ -25,13 +25,13 @@ func serveTestString() error {
 	return <-errs
 }
 
-func TestGetApply(t *testing.T) {
+func TestDownloadApply(t *testing.T) {
 	err := serveTestString()
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = GetApply("http://localhost:8080/test", func(reader io.ReadCloser) (err error) {
+	err = DownloadApply("http://localhost:8080/test", func(reader io.ReadCloser) (err error) {
 		result, err := ioutil.ReadAll(reader)
 		if err != nil {
 			t.Error(err)

@@ -6,8 +6,8 @@ import (
 	"github.com/moio/minima/util"
 )
 
-// GetApply downloads bytes from an URL via GET and applies a ReaderConsumer to the result
-func GetApply(url string, f util.ReaderConsumer) (err error) {
+// DownloadApply downloads bytes from an URL and applies a ReaderConsumer function to the result
+func DownloadApply(url string, f util.ReaderConsumer) (err error) {
 	response, err := http.Get(url)
 	if err != nil {
 		return
