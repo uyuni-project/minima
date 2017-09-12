@@ -61,6 +61,13 @@ var checksumTypeMap = map[string]ChecksumType{
 
 const repomdPath = "/repodata/repomd.xml"
 
+func storingMapper(s *Storage, path string) ReaderMapper {
+	return func(io io.ReadCloser) (result io.ReadCloser, err error) {
+		result, err = s.NewStoringReader(path, io)
+		return
+	}
+}
+
 // Stores a repo
 func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) {
 	files, err := processMetadata(url, storage, archs)
@@ -71,7 +78,7 @@ func StoreRepo(url string, storage *Storage, archs map[string]bool) (err error) 
 	log.Printf("Downloading %v packages...\n", len(files))
 	for _, file := range files {
 		log.Printf("...%v\n", file.Path)
-		err = Store(url+"/"+file.Path, storage, file.Path)
+		err = Store(url+"/"+file.Path, storingMapper(storage, file.Path))
 		if err != nil {
 			return
 		}
@@ -97,14 +104,14 @@ func processMetadata(url string, storage *Storage, archs map[string]bool) (files
 			if data[i].Type == "primary" {
 				files, err = processPrimary(metadataUrl, storage, metadataPath, archs)
 			} else {
-				err = Store(metadataUrl, storage, metadataPath)
+				err = Store(metadataUrl, storingMapper(storage, metadataPath))
 			}
 			if err != nil {
 				return
 			}
 		}
 		return
-	}, url+repomdPath, storage, repomdPath)
+	}, url+repomdPath, storingMapper(storage, repomdPath))
 	return
 }
 
@@ -148,6 +155,6 @@ func processPrimary(url string, storage *Storage, path string, archs map[string]
 			}
 		}
 		return
-	}, url, storage, path)
+	}, url, storingMapper(storage, path))
 	return
 }

@@ -5,16 +5,19 @@ import (
 	"net/http"
 )
 
-// Function maps a Reader to some other object
-type Function func(io.ReadCloser) (result interface{}, err error)
+// ReaderF maps a Reader to some other object
+type ReaderF func(io.ReadCloser) (result interface{}, err error)
+
+// ReaderMapper maps a Reader to another Reader
+type ReaderMapper func(io.ReadCloser) (result io.ReadCloser, err error)
 
 // nop maps a Reader to nothing
 func nop(r io.ReadCloser) (result interface{}, err error) {
 	return
 }
 
-// Apply applies a Function on data grabbed from an URL
-func Apply(f Function, url string) (result interface{}, err error) {
+// Apply applies a ReaderF on data grabbed from an URL
+func Apply(f ReaderF, url string) (result interface{}, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return
@@ -26,21 +29,21 @@ func Apply(f Function, url string) (result interface{}, err error) {
 
 // ApplyStoring is like Apply and also saves a copy of processed data in a
 // storage object
-func ApplyStoring(f Function, url string, store *Storage, path string) (result interface{}, err error) {
+func ApplyStoring(f ReaderF, url string, mapper ReaderMapper) (result interface{}, err error) {
 	return Apply(func(r io.ReadCloser) (result interface{}, err error) {
-		sr, err := store.NewStoringReader(path, r)
+		mappedR, err := mapper(r)
 		if err != nil {
 			return
 		}
-		defer sr.Close()
+		defer mappedR.Close()
 
-		result, err = f(sr)
+		result, err = f(mappedR)
 		return
 	}, url)
 }
 
 // Store saves data from an url in a storage object
-func Store(url string, store *Storage, path string) (err error) {
-	_, err = ApplyStoring(nop, url, store, path)
+func Store(url string, mapper ReaderMapper) (err error) {
+	_, err = ApplyStoring(nop, url, mapper)
 	return
 }
