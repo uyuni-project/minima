@@ -4,32 +4,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
-	"net"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/moio/minima/util"
 )
-
-func TestMain(m *testing.M) {
-	// start test server on localhost:8080
-	errs := make(chan error)
-	go func() {
-		listener, err := net.Listen("tcp", ":8080")
-		errs <- err
-		http.Serve(listener, nil)
-	}()
-
-	err := <-errs
-	if err != nil {
-		log.Panic("Could not start test HTTP server:", err)
-	}
-
-	os.Exit(m.Run())
-}
 
 func TestDownloadApply(t *testing.T) {
 	// Respond to http://localhost:8080/test with "Hello, World"
