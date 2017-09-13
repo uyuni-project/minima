@@ -68,7 +68,7 @@ func (s *FileStorage) Checksum(filename string, checksumType ChecksumType) (chec
 // StoringMapper returns a mapper that will store any read data to filename
 func (s *FileStorage) StoringMapper(filename string) util.ReaderMapper {
 	return func(reader io.ReadCloser) (result io.ReadCloser, err error) {
-		fullPath := path.Join(s.directory, filename)
+		fullPath := path.Join(s.directory+"-in-progress", filename)
 		// attempt to create any missing directories in the full path
 		err = os.MkdirAll(path.Dir(fullPath), os.ModePerm)
 		if err != nil {
@@ -108,4 +108,30 @@ func (t *storingReader) Close() (err error) {
 		return
 	}
 	return t.writer.Flush()
+}
+
+func (s *FileStorage) Recycle(filename string) (err error) {
+	newPath := path.Join(s.directory+"-in-progress", filename)
+	err = os.MkdirAll(path.Dir(newPath), os.ModePerm)
+	if err != nil {
+		return
+	}
+
+	return os.Link(path.Join(s.directory, filename), newPath)
+}
+
+func (s *FileStorage) Commit() (err error) {
+	err = os.RemoveAll(s.directory + "-old")
+	if err != nil {
+		return
+	}
+	err = os.Rename(s.directory, s.directory+"-old")
+	if err != nil && !os.IsNotExist(err) {
+		return
+	}
+	err = os.Rename(s.directory+"-in-progress", s.directory)
+	if err != nil {
+		return
+	}
+	return os.RemoveAll(s.directory + "-old")
 }

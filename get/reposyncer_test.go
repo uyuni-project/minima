@@ -22,6 +22,8 @@ func TestStoreRepo(t *testing.T) {
 	}
 	storage := NewFileStorage(directory)
 	reposyncer := NewRepoSyncer("http://localhost:8080/repo", archs, storage)
+
+	// first sync
 	err = reposyncer.StoreRepo()
 	if err != nil {
 		t.Error(err)
@@ -53,4 +55,11 @@ func TestStoreRepo(t *testing.T) {
 			t.Error("original and synced versions of", file, "differ:", originalInfo.Size(), "vs", syncedInfo.Size())
 		}
 	}
+
+	// second sync
+	err = reposyncer.StoreRepo()
+	if err != nil {
+		t.Error(err)
+	}
+
 }

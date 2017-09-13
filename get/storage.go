@@ -8,6 +8,8 @@ type Storage interface {
 	StoringMapper(filename string) util.ReaderMapper
 	FileExists(filename string) (fileExists bool)
 	Checksum(filename string, checksumType ChecksumType) (checksum string, err error)
+	Recycle(filename string) (err error)
+	Commit() (err error)
 }
 
 type ChecksumType int
