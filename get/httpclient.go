@@ -1,6 +1,7 @@
 package get
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/moio/minima/util"
@@ -11,6 +12,10 @@ func DownloadApply(url string, f util.ReaderConsumer) (err error) {
 	response, err := http.Get(url)
 	if err != nil {
 		return
+	}
+
+	if response.StatusCode != 200 {
+		return fmt.Errorf("Got unexpected status code from %s, %d", url, response.StatusCode)
 	}
 
 	body := response.Body

@@ -6,7 +6,10 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
+
+	"github.com/moio/minima/util"
 )
 
 // Runs a server on http://localhost:8080/test responding with "Hello, World"
@@ -31,6 +34,7 @@ func TestDownloadApply(t *testing.T) {
 		t.Error(err)
 	}
 
+	// 200
 	err = DownloadApply("http://localhost:8080/test", func(reader io.ReadCloser) (err error) {
 		result, err := ioutil.ReadAll(reader)
 		if err != nil {
@@ -43,5 +47,11 @@ func TestDownloadApply(t *testing.T) {
 	})
 	if err != nil {
 		t.Error(err)
+	}
+
+	// 404
+	err = DownloadApply("http://localhost:8080/not_existing", util.Nop)
+	if !strings.Contains(err.Error(), "404") {
+		t.Error("404 error expected, got ", err)
 	}
 }
