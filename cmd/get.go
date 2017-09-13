@@ -24,7 +24,7 @@ var getCmd = &cobra.Command{
 			return errors.New("Please specify one repo URL")
 		}
 		url := args[0]
-		archs := make(map[string]bool)
+		archs := map[string]bool{}
 		if archString != "all" {
 			archStrings := strings.Split(archString, ",")
 			for _, arch := range archStrings {

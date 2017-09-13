@@ -141,9 +141,9 @@ func (r *RepoSyncer) processPrimary(path string) (files []PackageFile, err error
 			return
 		}
 
-		archCount := len(r.archs)
+		allArchs := len(r.archs) == 0
 		for _, pack := range primary.Packages {
-			if archCount == 0 || r.archs[pack.Arch] {
+			if allArchs || pack.Arch == "noarch" || r.archs[pack.Arch] {
 				if !r.storage.FileExists(pack.Location.Href) {
 					log.Printf("...package '%v' not found, I will download it\n", pack.Location.Href)
 					files = append(files, PackageFile{pack.Location.Href, pack.Checksum.Checksum, checksumTypeMap[pack.Checksum.Type]})
