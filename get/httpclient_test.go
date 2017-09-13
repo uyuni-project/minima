@@ -4,20 +4,18 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/moio/minima/util"
 )
 
-// Runs a server on http://localhost:8080/test responding with "Hello, World"
-func serveTestString() error {
-	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello, World")
-	})
-
+func TestMain(m *testing.M) {
+	// start test server on localhost:8080
 	errs := make(chan error)
 	go func() {
 		listener, err := net.Listen("tcp", ":8080")
@@ -25,17 +23,22 @@ func serveTestString() error {
 		http.Serve(listener, nil)
 	}()
 
-	return <-errs
+	err := <-errs
+	if err != nil {
+		log.Panic("Could not start test HTTP server:", err)
+	}
+
+	os.Exit(m.Run())
 }
 
 func TestDownloadApply(t *testing.T) {
-	err := serveTestString()
-	if err != nil {
-		t.Error(err)
-	}
+	// Respond to http://localhost:8080/test with "Hello, World"
+	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello, World")
+	})
 
 	// 200
-	err = DownloadApply("http://localhost:8080/test", func(reader io.ReadCloser) (err error) {
+	err := DownloadApply("http://localhost:8080/test", func(reader io.ReadCloser) (err error) {
 		result, err := ioutil.ReadAll(reader)
 		if err != nil {
 			t.Error(err)

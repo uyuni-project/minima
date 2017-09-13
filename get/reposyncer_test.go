@@ -1,35 +1,18 @@
 package get
 
 import (
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-// Runs a server on http://localhost:8080/ serving the content of the testdata directory
-func serveTestRepo() error {
-	handler := http.FileServer(http.Dir("testdata"))
-
-	errs := make(chan error)
-	go func() {
-		listener, err := net.Listen("tcp", ":8081")
-		errs <- err
-		http.Serve(listener, handler)
-	}()
-
-	return <-errs
-}
-
 func TestStoreRepo(t *testing.T) {
-	err := serveTestRepo()
-	if err != nil {
-		t.Error(err)
-	}
+	// Respond to http://localhost:8080/repo serving the content of the testdata/repo directory
+	http.Handle("/", http.FileServer(http.Dir("testdata")))
 
 	directory := filepath.Join(os.TempDir(), "reposyncer_test")
-	err = os.RemoveAll(directory)
+	err := os.RemoveAll(directory)
 	if err != nil {
 		t.Error(err)
 	}
@@ -38,7 +21,7 @@ func TestStoreRepo(t *testing.T) {
 		"x86_64": true,
 	}
 	storage := NewFileStorage(directory)
-	reposyncer := NewRepoSyncer("http://localhost:8081/testrepo", archs, storage)
+	reposyncer := NewRepoSyncer("http://localhost:8080/repo", archs, storage)
 	err = reposyncer.StoreRepo()
 	if err != nil {
 		t.Error(err)
@@ -58,7 +41,7 @@ func TestStoreRepo(t *testing.T) {
 	}
 
 	for _, file := range expectedFiles {
-		originalInfo, err := os.Stat(filepath.Join("testdata", "testrepo", file))
+		originalInfo, err := os.Stat(filepath.Join("testdata", "repo", file))
 		if err != nil {
 			t.Error(err)
 		}
