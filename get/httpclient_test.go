@@ -22,7 +22,7 @@ func serveTestString() error {
 	go func() {
 		listener, err := net.Listen("tcp", ":8080")
 		errs <- err
-		go http.Serve(listener, nil)
+		http.Serve(listener, nil)
 	}()
 
 	return <-errs

@@ -16,7 +16,7 @@ func serveTestRepo() error {
 	go func() {
 		listener, err := net.Listen("tcp", ":8081")
 		errs <- err
-		go http.Serve(listener, handler)
+		http.Serve(listener, handler)
 	}()
 
 	return <-errs
