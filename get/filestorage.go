@@ -15,17 +15,17 @@ import (
 	"github.com/moio/minima/util"
 )
 
-// Storage allows to store data in a local directory
+// FileStorage allows to store data in a local directory
 type FileStorage struct {
 	directory string
 }
 
-// NewStorage returns a new Storage given a local directory
+// NewFileStorage returns a new Storage given a local directory
 func NewFileStorage(directory string) Storage {
 	return &FileStorage{directory}
 }
 
-// FileExists returns a flag whether the file exists or not on the storage
+// FileExists checks whether a file exists or not in the permanent location
 func (s *FileStorage) FileExists(filename string) (fileExists bool) {
 	fullPath := path.Join(s.directory, filename)
 	file, err := os.Stat(fullPath)
@@ -36,8 +36,7 @@ func (s *FileStorage) FileExists(filename string) (fileExists bool) {
 	return true
 }
 
-// Checksum returns the checksum value of a file,
-// the algorithm to evaluate it depends on the checksumType parameter
+// Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm
 func (s *FileStorage) Checksum(filename string, checksumType ChecksumType) (checksum string, err error) {
 	fullPath := path.Join(s.directory, filename)
 	f, err := os.Open(fullPath)
@@ -49,13 +48,13 @@ func (s *FileStorage) Checksum(filename string, checksumType ChecksumType) (chec
 	switch checksumType {
 	case SHA1:
 		h := sha1.New()
-		if _, err := io.Copy(h, f); err != nil {
+		if _, err = io.Copy(h, f); err != nil {
 			log.Fatal(err)
 		}
 		checksum = hex.EncodeToString(h.Sum(nil))
 	case SHA256:
 		h := sha256.New()
-		if _, err := io.Copy(h, f); err != nil {
+		if _, err = io.Copy(h, f); err != nil {
 			log.Fatal(err)
 		}
 		checksum = hex.EncodeToString(h.Sum(nil))
@@ -65,7 +64,7 @@ func (s *FileStorage) Checksum(filename string, checksumType ChecksumType) (chec
 	return
 }
 
-// StoringMapper returns a mapper that will store any read data to filename
+// StoringMapper returns a mapper that will store read data to a temporary location specified by filename
 func (s *FileStorage) StoringMapper(filename string) util.ReaderMapper {
 	return func(reader io.ReadCloser) (result io.ReadCloser, err error) {
 		fullPath := path.Join(s.directory+"-in-progress", filename)
@@ -110,6 +109,7 @@ func (t *storingReader) Close() (err error) {
 	return t.writer.Flush()
 }
 
+// Recycle will copy a file from the permanent to the temporary location
 func (s *FileStorage) Recycle(filename string) (err error) {
 	newPath := path.Join(s.directory+"-in-progress", filename)
 	err = os.MkdirAll(path.Dir(newPath), os.ModePerm)
@@ -120,6 +120,7 @@ func (s *FileStorage) Recycle(filename string) (err error) {
 	return os.Link(path.Join(s.directory, filename), newPath)
 }
 
+// Commit moves any temporary file accumulated so far to the permanent location
 func (s *FileStorage) Commit() (err error) {
 	err = os.RemoveAll(s.directory + "-old")
 	if err != nil {
