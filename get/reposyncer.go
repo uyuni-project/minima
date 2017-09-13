@@ -82,8 +82,8 @@ func (r *RepoSyncer) StoreRepo() (err error) {
 
 	log.Printf("Downloading %v packages...\n", len(files))
 	for _, file := range files {
-		log.Printf("...%v\n", file.Path)
-		err = r.downloadStoreApply(file.Path, util.Nop)
+		log.Printf("...%v\n", file)
+		err = r.downloadStoreApply(file, util.Nop)
 		if err != nil {
 			return
 		}
@@ -98,7 +98,7 @@ func (r *RepoSyncer) downloadStoreApply(path string, f util.ReaderConsumer) erro
 
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
-func (r *RepoSyncer) processMetadata() (files []PackageFile, err error) {
+func (r *RepoSyncer) processMetadata() (files []string, err error) {
 	err = r.downloadStoreApply(repomdPath, func(reader io.ReadCloser) (err error) {
 		decoder := xml.NewDecoder(reader)
 		var repomd XmlRepomd
@@ -126,7 +126,7 @@ func (r *RepoSyncer) processMetadata() (files []PackageFile, err error) {
 
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
-func (r *RepoSyncer) processPrimary(path string) (files []PackageFile, err error) {
+func (r *RepoSyncer) processPrimary(path string) (files []string, err error) {
 	err = r.downloadStoreApply(path, func(reader io.ReadCloser) (err error) {
 		gzReader, err := gzip.NewReader(reader)
 		if err != nil {
@@ -146,7 +146,7 @@ func (r *RepoSyncer) processPrimary(path string) (files []PackageFile, err error
 			if allArchs || pack.Arch == "noarch" || r.archs[pack.Arch] {
 				if !r.storage.FileExists(pack.Location.Href) {
 					log.Printf("...package '%v' not found, I will download it\n", pack.Location.Href)
-					files = append(files, PackageFile{pack.Location.Href, pack.Checksum.Checksum, checksumTypeMap[pack.Checksum.Type]})
+					files = append(files, pack.Location.Href)
 				} else {
 					storageChecksum, err := r.storage.Checksum(pack.Location.Href, checksumTypeMap[pack.Checksum.Type])
 					if err != nil {
@@ -156,7 +156,7 @@ func (r *RepoSyncer) processPrimary(path string) (files []PackageFile, err error
 					} else if pack.Checksum.Checksum != storageChecksum {
 						log.Printf("...package '%v' has a checksum error!!\n", pack.Location.Href)
 						log.Printf("[repo vs local] = ['%v' VS '%v']\n", pack.Checksum.Checksum, storageChecksum)
-						files = append(files, PackageFile{pack.Location.Href, pack.Checksum.Checksum, checksumTypeMap[pack.Checksum.Type]})
+						files = append(files, pack.Location.Href)
 					} else {
 						log.Printf("...package '%v' is up-to-date\n", pack.Location.Href)
 					}
