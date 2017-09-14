@@ -2,6 +2,7 @@ package util
 
 import (
 	"io"
+	"io/ioutil"
 )
 
 // ReaderConsumer consumes bytes from a Reader
@@ -42,3 +43,32 @@ func (r *NopReadCloser) Read(p []byte) (n int, err error) { return r.r.Read(p) }
 
 // Close does nothing
 func (r *NopReadCloser) Close() error { return nil }
+
+// TeeReadCloser uses a TeeReader to copy data from a reader to a writer
+type TeeReadCloser struct {
+	reader    io.ReadCloser
+	writer    io.WriteCloser
+	teeReader io.Reader
+}
+
+// NewTeeReadCloser returns a new TeeReadCloser
+func NewTeeReadCloser(reader io.ReadCloser, writer io.WriteCloser) *TeeReadCloser {
+	teeReader := io.TeeReader(reader, writer)
+	return &TeeReadCloser{reader, writer, teeReader}
+}
+
+// Read delegates to the TeeReader implementation
+func (t *TeeReadCloser) Read(p []byte) (n int, err error) {
+	return t.teeReader.Read(p)
+}
+
+// Close closes the internal reader and writer
+func (t *TeeReadCloser) Close() (err error) {
+	ioutil.ReadAll(t.teeReader)
+	err = t.reader.Close()
+	if err != nil {
+		return
+	}
+	err = t.writer.Close()
+	return
+}

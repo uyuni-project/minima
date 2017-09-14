@@ -1,13 +1,11 @@
 package get
 
 import (
-	"bufio"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -79,34 +77,9 @@ func (s *FileStorage) StoringMapper(filename string) util.ReaderMapper {
 			return
 		}
 
-		writer := bufio.NewWriter(file)
-		teeReader := io.TeeReader(reader, writer)
-
-		result = &storingReader{reader, writer, teeReader}
+		result = util.NewTeeReadCloser(reader, file)
 		return
 	}
-}
-
-// storingReader uses a TeeReader to copy data from a reader to a writer
-type storingReader struct {
-	reader    io.ReadCloser
-	writer    *bufio.Writer
-	teeReader io.Reader
-}
-
-// Read delegates to the TeeReader implementation
-func (t *storingReader) Read(p []byte) (n int, err error) {
-	return t.teeReader.Read(p)
-}
-
-// Closes the internal reader and flushes the writer
-func (t *storingReader) Close() (err error) {
-	ioutil.ReadAll(t.teeReader)
-	err = t.reader.Close()
-	if err != nil {
-		return
-	}
-	return t.writer.Flush()
 }
 
 // Recycle will copy a file from the permanent to the temporary location
