@@ -104,7 +104,7 @@ func (r *RepoSyncer) StoreRepo() (err error) {
 
 // downloadStoreApply downloads a URL into a file, while applying a ReaderConsumer
 func (r *RepoSyncer) downloadStoreApply(path string, f util.ReaderConsumer) error {
-	return DownloadApply(r.url+"/"+path, util.Compose(r.storage.StoringMapper(path), f))
+	return DownloadApply(r.url+"/"+path, util.Compose(r.storage.StoringMapper(path, ""), f))
 }
 
 // processMetadata stores the repo metadata and returns a list of package file
