@@ -155,23 +155,22 @@ func (r *RepoSyncer) processPrimary(path string) (pathsToDownload []string, path
 		allArchs := len(r.archs) == 0
 		for _, pack := range primary.Packages {
 			if allArchs || pack.Arch == "noarch" || r.archs[pack.Arch] {
-				if !r.storage.FileExists(pack.Location.Href) {
+				storageChecksum, err := r.storage.Checksum(pack.Location.Href, checksumTypeMap[pack.Checksum.Type])
+				switch {
+				case err == ErrFileNotFound:
 					log.Printf("...package '%v' not found, I will download it\n", pack.Location.Href)
 					pathsToDownload = append(pathsToDownload, pack.Location.Href)
-				} else {
-					storageChecksum, err := r.storage.Checksum(pack.Location.Href, checksumTypeMap[pack.Checksum.Type])
-					if err != nil {
-						log.Printf("Checksum evaluation of the package '%v' returned the following error:\n", pack.Location.Href)
-						log.Printf("Error message: %v\n", err)
-						log.Println("...package skipped")
-					} else if pack.Checksum.Checksum != storageChecksum {
-						log.Printf("...package '%v' has a checksum error!!\n", pack.Location.Href)
-						log.Printf("[repo vs local] = ['%v' VS '%v']\n", pack.Checksum.Checksum, storageChecksum)
-						pathsToDownload = append(pathsToDownload, pack.Location.Href)
-					} else {
-						log.Printf("...package '%v' is up-to-date already, will be recycled\n", pack.Location.Href)
-						pathsToRecycle = append(pathsToRecycle, pack.Location.Href)
-					}
+				case err != nil:
+					log.Printf("Checksum evaluation of the package '%v' returned the following error:\n", pack.Location.Href)
+					log.Printf("Error message: %v\n", err)
+					log.Println("...package skipped")
+				case pack.Checksum.Checksum != storageChecksum:
+					log.Printf("...package '%v' has a checksum error!!\n", pack.Location.Href)
+					log.Printf("[repo vs local] = ['%v' VS '%v']\n", pack.Checksum.Checksum, storageChecksum)
+					pathsToDownload = append(pathsToDownload, pack.Location.Href)
+				default:
+					log.Printf("...package '%v' is up-to-date already, will be recycled\n", pack.Location.Href)
+					pathsToRecycle = append(pathsToRecycle, pack.Location.Href)
 				}
 			}
 		}

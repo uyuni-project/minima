@@ -23,20 +23,15 @@ func NewFileStorage(directory string) Storage {
 	return &FileStorage{directory}
 }
 
-// FileExists checks whether a file exists or not in the permanent location
-func (s *FileStorage) FileExists(filename string) (fileExists bool) {
-	fullPath := path.Join(s.directory, filename)
-	file, err := os.Stat(fullPath)
-	if os.IsNotExist(err) || file == nil {
-		log.Printf("...package '%v' does not exists\n", fullPath)
-		return false
-	}
-	return true
-}
-
 // Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm
 func (s *FileStorage) Checksum(filename string, checksumType ChecksumType) (checksum string, err error) {
 	fullPath := path.Join(s.directory, filename)
+	stat, err := os.Stat(fullPath)
+	if os.IsNotExist(err) || stat == nil {
+		err = ErrFileNotFound
+		return
+	}
+
 	f, err := os.Open(fullPath)
 	if err != nil {
 		log.Fatal(err)

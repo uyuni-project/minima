@@ -1,6 +1,8 @@
 package get
 
 import (
+	"errors"
+
 	"github.com/moio/minima/util"
 )
 
@@ -12,9 +14,8 @@ type Storage interface {
 	StoringMapper(filename string, checksum string) util.ReaderMapper
 	// Commit moves any temporary file accumulated so far to the permanent location
 	Commit() (err error)
-	// FileExists checks whether a file exists or not in the permanent location
-	FileExists(filename string) (fileExists bool)
 	// Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm
+	// returns ErrFileNotFound if the requested path was not found at all
 	Checksum(filename string, checksumType ChecksumType) (checksum string, err error)
 	// Recycle will copy a file from the permanent to the temporary location
 	Recycle(filename string) (err error)
@@ -29,3 +30,6 @@ const (
 	// SHA256 identifier
 	SHA256
 )
+
+// ErrFileNotFound signals that the requested file was not found
+var ErrFileNotFound = errors.New("File not found")
