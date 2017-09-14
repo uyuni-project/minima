@@ -26,7 +26,6 @@ func Compose(mapper ReaderMapper, f ReaderConsumer) ReaderConsumer {
 
 // Nop is a ReaderConsumer that does nothing
 func Nop(reader io.ReadCloser) (err error) {
-	defer reader.Close()
 	return
 }
 
