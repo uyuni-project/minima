@@ -89,7 +89,6 @@ func syncersFromConfig(config string) (result []*get.Syncer, err error) {
 			if err != nil {
 				return nil, fmt.Errorf("Configuration parse error for repo %s: path is invalid", url)
 			}
-			log.Println(path)
 			storage = get.NewFileStorage(path)
 		} else {
 			// s3-specific
@@ -117,7 +116,7 @@ func syncersFromConfig(config string) (result []*get.Syncer, err error) {
 
 				storage, err = get.NewS3Storage(accessKeyID, secretAccessKey, region, bucket)
 				if err != nil {
-					log.Fatal(err)
+					return nil, err
 				}
 			} else {
 				return nil, fmt.Errorf("Configuration parse error for repo %s: either path (filesystem storage) or bucket (AWS S3 storage) must be specified", url)
