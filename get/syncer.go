@@ -59,7 +59,8 @@ const repomdPath = "repodata/repomd.xml"
 
 // Syncer syncs repos from an HTTP source to a Storage
 type Syncer struct {
-	url     string
+	// URL of the repo this syncer syncs
+	Url     string
 	archs   map[string]bool
 	storage Storage
 }
@@ -104,7 +105,7 @@ func (r *Syncer) StoreRepo() (err error) {
 
 // downloadStoreApply downloads a URL into a file, while applying a ReaderConsumer
 func (r *Syncer) downloadStoreApply(path string, checksum string, f util.ReaderConsumer) error {
-	return DownloadApply(r.url+"/"+path, util.Compose(r.storage.StoringMapper(path, checksum), f))
+	return DownloadApply(r.Url+"/"+path, util.Compose(r.storage.StoringMapper(path, checksum), f))
 }
 
 // processMetadata stores the repo metadata and returns a list of package file

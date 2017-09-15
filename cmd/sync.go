@@ -37,6 +37,7 @@ var syncCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 		for _, syncer := range syncers {
+			log.Printf("Processing repo: %s", syncer.Url)
 			err := syncer.StoreRepo()
 			if err != nil {
 				log.Fatal(err)
