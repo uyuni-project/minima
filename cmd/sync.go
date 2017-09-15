@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/moio/minima/get"
@@ -31,87 +32,12 @@ var syncCmd = &cobra.Command{
       archs: [x86_64]
   `,
 	Run: func(cmd *cobra.Command, args []string) {
-		result, err := simpleyaml.NewYaml([]byte(cfgString))
+		syncers, err := syncersFromConfig(cfgString)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		repoCount, err := result.GetArraySize()
-		if err != nil {
-			log.Fatal("Configuration parse error:", err)
-		}
-
-		var repoSyncers []*get.RepoSyncer
-		for i := 0; i < repoCount; i++ {
-			// common options
-			repoNode := result.GetIndex(i)
-			url, err := repoNode.Get("url").String()
-			if err != nil {
-				log.Fatal("Configuration parse error:", err)
-			}
-
-			archs := map[string]bool{}
-			archsNode := repoNode.Get("archs")
-			if archsNode.IsArray() {
-				archStrings, err := archsNode.Array()
-				if err != nil {
-					log.Fatal("Configuration parse error:", err)
-				}
-
-				for _, archString := range archStrings {
-					archs[archString.(string)] = true
-				}
-			}
-
-			var storage get.Storage
-
-			// file-specific
-			pathNode := repoNode.Get("path")
-			if pathNode.IsFound() {
-				path, err := pathNode.String()
-				if err != nil {
-					log.Fatal("Configuration parse error: path is invalid")
-				}
-				log.Println(path)
-				storage = get.NewFileStorage(path)
-			} else {
-				// s3-specific
-				bucketNode := repoNode.Get("bucket")
-				if bucketNode.IsFound() {
-					bucket, err := bucketNode.String()
-					if err != nil {
-						log.Fatal("Configuration parse error: bucket is invalid")
-					}
-
-					region, err := repoNode.Get("region").String()
-					if err != nil {
-						log.Fatal("Configuration parse error: region invalid or not specified")
-					}
-
-					accessKeyID, err := repoNode.Get("access_key_id").String()
-					if err != nil {
-						log.Fatal("Configuration parse error: access_key_id invalid or not specified")
-					}
-
-					secretAccessKey, err := repoNode.Get("secret_access_key").String()
-					if err != nil {
-						log.Fatal("Configuration parse error: secret_access_key invalid or not specified")
-					}
-
-					storage, err = get.NewS3Storage(accessKeyID, secretAccessKey, region, bucket)
-					if err != nil {
-						log.Fatal(err)
-					}
-				} else {
-					log.Fatal("Every repository must specify either path (filesystem storage) or bucket (AWS S3 storage)")
-				}
-			}
-
-			repoSyncers = append(repoSyncers, get.NewRepoSyncer(url, archs, storage))
-		}
-
-		for _, repoSyncer := range repoSyncers {
-			err := repoSyncer.StoreRepo()
+		for _, syncer := range syncers {
+			err := syncer.StoreRepo()
 			if err != nil {
 				log.Fatal(err)
 			} else {
@@ -119,6 +45,87 @@ var syncCmd = &cobra.Command{
 			}
 		}
 	},
+}
+
+func syncersFromConfig(config string) (result []*get.Syncer, err error) {
+	yaml, err := simpleyaml.NewYaml([]byte(config))
+	if err != nil {
+		return
+	}
+
+	repoCount, err := yaml.GetArraySize()
+	if err != nil {
+		return nil, fmt.Errorf("Configuration parse error: top-level structure is not an array")
+	}
+
+	for i := 0; i < repoCount; i++ {
+		// common options
+		repoNode := yaml.GetIndex(i)
+		url, err := repoNode.Get("url").String()
+		if err != nil {
+			return nil, fmt.Errorf("Configuration parse error in entry %d: every entry must have an url key", i+1)
+		}
+
+		archs := map[string]bool{}
+		archsNode := repoNode.Get("archs")
+		if archsNode.IsArray() {
+			archStrings, err := archsNode.Array()
+			if err != nil {
+				return nil, fmt.Errorf("Configuration parse error for repo %s: archs should be an array", url)
+			}
+
+			for _, archString := range archStrings {
+				archs[archString.(string)] = true
+			}
+		}
+
+		var storage get.Storage
+
+		// file-specific
+		pathNode := repoNode.Get("path")
+		if pathNode.IsFound() {
+			path, err := pathNode.String()
+			if err != nil {
+				return nil, fmt.Errorf("Configuration parse error for repo %s: path is invalid", url)
+			}
+			log.Println(path)
+			storage = get.NewFileStorage(path)
+		} else {
+			// s3-specific
+			bucketNode := repoNode.Get("bucket")
+			if bucketNode.IsFound() {
+				bucket, err := bucketNode.String()
+				if err != nil {
+					return nil, fmt.Errorf("Configuration parse error for repo %s: bucket is invalid", url)
+				}
+
+				region, err := repoNode.Get("region").String()
+				if err != nil {
+					return nil, fmt.Errorf("Configuration parse error for repo %s: region invalid or not specified", url)
+				}
+
+				accessKeyID, err := repoNode.Get("access_key_id").String()
+				if err != nil {
+					return nil, fmt.Errorf("Configuration parse error for repo %s: access_key_id invalid or not specified", url)
+				}
+
+				secretAccessKey, err := repoNode.Get("secret_access_key").String()
+				if err != nil {
+					return nil, fmt.Errorf("Configuration parse error for repo %s: secret_access_key invalid or not specified", url)
+				}
+
+				storage, err = get.NewS3Storage(accessKeyID, secretAccessKey, region, bucket)
+				if err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				return nil, fmt.Errorf("Configuration parse error for repo %s: either path (filesystem storage) or bucket (AWS S3 storage) must be specified", url)
+			}
+		}
+
+		result = append(result, get.NewSyncer(url, archs, storage))
+	}
+	return
 }
 
 func init() {

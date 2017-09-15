@@ -57,20 +57,20 @@ var checksumTypeMap = map[string]ChecksumType{
 
 const repomdPath = "repodata/repomd.xml"
 
-// RepoSyncer syncs repos from an HTTP source to a Storage
-type RepoSyncer struct {
+// Syncer syncs repos from an HTTP source to a Storage
+type Syncer struct {
 	url     string
 	archs   map[string]bool
 	storage Storage
 }
 
-// NewRepoSyncer creates a new RepoSyncer
-func NewRepoSyncer(url string, archs map[string]bool, storage Storage) *RepoSyncer {
-	return &RepoSyncer{url, archs, storage}
+// NewSyncer creates a new Syncer
+func NewSyncer(url string, archs map[string]bool, storage Storage) *Syncer {
+	return &Syncer{url, archs, storage}
 }
 
 // StoreRepo stores an HTTP repo in a Storage
-func (r *RepoSyncer) StoreRepo() (err error) {
+func (r *Syncer) StoreRepo() (err error) {
 	packagesToDownload, packagesToRecycle, err := r.processMetadata()
 	if err != nil {
 		return
@@ -103,13 +103,13 @@ func (r *RepoSyncer) StoreRepo() (err error) {
 }
 
 // downloadStoreApply downloads a URL into a file, while applying a ReaderConsumer
-func (r *RepoSyncer) downloadStoreApply(path string, checksum string, f util.ReaderConsumer) error {
+func (r *Syncer) downloadStoreApply(path string, checksum string, f util.ReaderConsumer) error {
 	return DownloadApply(r.url+"/"+path, util.Compose(r.storage.StoringMapper(path, checksum), f))
 }
 
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
-func (r *RepoSyncer) processMetadata() (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
+func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
 	err = r.downloadStoreApply(repomdPath, "", func(reader io.ReadCloser) (err error) {
 		decoder := xml.NewDecoder(reader)
 		var repomd XMLRepomd
@@ -137,7 +137,7 @@ func (r *RepoSyncer) processMetadata() (packagesToDownload []XMLPackage, package
 
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
-func (r *RepoSyncer) processPrimary(path string) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
+func (r *Syncer) processPrimary(path string) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
 	err = r.downloadStoreApply(path, "", func(reader io.ReadCloser) (err error) {
 		gzReader, err := gzip.NewReader(reader)
 		if err != nil {

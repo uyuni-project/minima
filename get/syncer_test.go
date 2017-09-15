@@ -11,7 +11,7 @@ func TestStoreRepo(t *testing.T) {
 	// Respond to http://localhost:8080/repo serving the content of the testdata/repo directory
 	http.Handle("/", http.FileServer(http.Dir("testdata")))
 
-	directory := filepath.Join(os.TempDir(), "reposyncer_test")
+	directory := filepath.Join(os.TempDir(), "syncer_test")
 	err := os.RemoveAll(directory)
 	if err != nil {
 		t.Error(err)
@@ -21,10 +21,10 @@ func TestStoreRepo(t *testing.T) {
 		"x86_64": true,
 	}
 	storage := NewFileStorage(directory)
-	reposyncer := NewRepoSyncer("http://localhost:8080/repo", archs, storage)
+	syncer := NewSyncer("http://localhost:8080/repo", archs, storage)
 
 	// first sync
-	err = reposyncer.StoreRepo()
+	err = syncer.StoreRepo()
 	if err != nil {
 		t.Error(err)
 	}
@@ -57,7 +57,7 @@ func TestStoreRepo(t *testing.T) {
 	}
 
 	// second sync
-	err = reposyncer.StoreRepo()
+	err = syncer.StoreRepo()
 	if err != nil {
 		t.Error(err)
 	}
