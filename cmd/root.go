@@ -2,13 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var cfgFile string
+var cfgString string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -29,21 +31,36 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.minima.yaml)")
+	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "minima.yaml", "config file")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" { // enable ability to specify config file via flag
-		viper.SetConfigFile(cfgFile)
+	// first, try from the commandline flag
+	if cfgFile != "" {
+		bytes, err := ioutil.ReadFile(cfgFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		cfgString = string(bytes)
+		fmt.Println("Using config file:", cfgFile)
+		return
 	}
 
-	viper.SetConfigName(".minima") // name of config file (without extension)
-	viper.AddConfigPath("$HOME")   // adding home directory as first search path
-	viper.AutomaticEnv()           // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	// second, try via environment variable
+	ev := os.Getenv("MINIMA_CONFIG")
+	if ev != "" {
+		cfgString = ev
+		fmt.Println("Using configuration from $MINIMA_CONFIG")
+		return
 	}
+
+	// third, try with minima.yaml
+	bytes, err := ioutil.ReadFile("minima.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfgString = string(bytes)
+	fmt.Println("Using config file:", cfgFile)
+	return
 }
