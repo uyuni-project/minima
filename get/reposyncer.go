@@ -71,24 +71,24 @@ func NewRepoSyncer(url string, archs map[string]bool, storage Storage) *RepoSync
 
 // StoreRepo stores an HTTP repo in a Storage
 func (r *RepoSyncer) StoreRepo() (err error) {
-	pathsToDownload, pathsToRecycle, err := r.processMetadata()
+	packagesToDownload, packagesToRecycle, err := r.processMetadata()
 	if err != nil {
 		return
 	}
 
-	log.Printf("Downloading %v packages...\n", len(pathsToDownload))
-	for _, path := range pathsToDownload {
-		log.Printf("...%v\n", path)
-		err = r.downloadStoreApply(path, util.Nop)
+	log.Printf("Downloading %v packages...\n", len(packagesToDownload))
+	for _, pack := range packagesToDownload {
+		log.Printf("...%v\n", pack.Location.Href)
+		err = r.downloadStoreApply(pack.Location.Href, pack.Checksum.Checksum, util.Nop)
 		if err != nil {
 			return
 		}
 	}
 
-	log.Printf("Recycling %v packages...\n", len(pathsToRecycle))
-	for _, path := range pathsToRecycle {
-		log.Printf("...%v\n", path)
-		err = r.storage.Recycle(path)
+	log.Printf("Recycling %v packages...\n", len(packagesToRecycle))
+	for _, pack := range packagesToRecycle {
+		log.Printf("...%v\n", pack.Location.Href)
+		err = r.storage.Recycle(pack.Location.Href)
 		if err != nil {
 			return
 		}
@@ -103,14 +103,14 @@ func (r *RepoSyncer) StoreRepo() (err error) {
 }
 
 // downloadStoreApply downloads a URL into a file, while applying a ReaderConsumer
-func (r *RepoSyncer) downloadStoreApply(path string, f util.ReaderConsumer) error {
-	return DownloadApply(r.url+"/"+path, util.Compose(r.storage.StoringMapper(path, ""), f))
+func (r *RepoSyncer) downloadStoreApply(path string, checksum string, f util.ReaderConsumer) error {
+	return DownloadApply(r.url+"/"+path, util.Compose(r.storage.StoringMapper(path, checksum), f))
 }
 
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
-func (r *RepoSyncer) processMetadata() (pathsToDownload []string, pathsToRecycle []string, err error) {
-	err = r.downloadStoreApply(repomdPath, func(reader io.ReadCloser) (err error) {
+func (r *RepoSyncer) processMetadata() (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
+	err = r.downloadStoreApply(repomdPath, "", func(reader io.ReadCloser) (err error) {
 		decoder := xml.NewDecoder(reader)
 		var repomd XMLRepomd
 		err = decoder.Decode(&repomd)
@@ -122,9 +122,9 @@ func (r *RepoSyncer) processMetadata() (pathsToDownload []string, pathsToRecycle
 		for i := 0; i < len(data); i++ {
 			metadataPath := data[i].Location.Href
 			if data[i].Type == "primary" {
-				pathsToDownload, pathsToRecycle, err = r.processPrimary(metadataPath)
+				packagesToDownload, packagesToRecycle, err = r.processPrimary(metadataPath)
 			} else {
-				err = r.downloadStoreApply(metadataPath, util.Nop)
+				err = r.downloadStoreApply(metadataPath, "", util.Nop)
 			}
 			if err != nil {
 				return
@@ -137,8 +137,8 @@ func (r *RepoSyncer) processMetadata() (pathsToDownload []string, pathsToRecycle
 
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
-func (r *RepoSyncer) processPrimary(path string) (pathsToDownload []string, pathsToRecycle []string, err error) {
-	err = r.downloadStoreApply(path, func(reader io.ReadCloser) (err error) {
+func (r *RepoSyncer) processPrimary(path string) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
+	err = r.downloadStoreApply(path, "", func(reader io.ReadCloser) (err error) {
 		gzReader, err := gzip.NewReader(reader)
 		if err != nil {
 			return
@@ -159,7 +159,7 @@ func (r *RepoSyncer) processPrimary(path string) (pathsToDownload []string, path
 				switch {
 				case err == ErrFileNotFound:
 					log.Printf("...package '%v' not found, I will download it\n", pack.Location.Href)
-					pathsToDownload = append(pathsToDownload, pack.Location.Href)
+					packagesToDownload = append(packagesToDownload, pack)
 				case err != nil:
 					log.Printf("Checksum evaluation of the package '%v' returned the following error:\n", pack.Location.Href)
 					log.Printf("Error message: %v\n", err)
@@ -167,10 +167,10 @@ func (r *RepoSyncer) processPrimary(path string) (pathsToDownload []string, path
 				case pack.Checksum.Checksum != storageChecksum:
 					log.Printf("...package '%v' has a checksum error!!\n", pack.Location.Href)
 					log.Printf("[repo vs local] = ['%v' VS '%v']\n", pack.Checksum.Checksum, storageChecksum)
-					pathsToDownload = append(pathsToDownload, pack.Location.Href)
+					packagesToDownload = append(packagesToDownload, pack)
 				default:
 					log.Printf("...package '%v' is up-to-date already, will be recycled\n", pack.Location.Href)
-					pathsToRecycle = append(pathsToRecycle, pack.Location.Href)
+					packagesToRecycle = append(packagesToRecycle, pack)
 				}
 			}
 		}
