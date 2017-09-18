@@ -1,23 +1,31 @@
 # minima
-A Simple Linux Repository Manager.
+minima is a simple Linux repository manager.
 
-Currently, it's a commandline utility to download RPM repos locally via http (mirroring).
+Currently, the only implemented functionality is the smart downloading of RPM repos from an HTTP source for mirroring. Downloaded repos can be saved either in a local filesystem directory or an Amazon S3 bucket.
 
-Usage:
+
+## Configuration
+
+You can specify configuration in YAML either in a file (by default `minima.yaml`) or the `MINIMA_CONFIG` environment variable.
+
+
+An example `minima.yaml` is below:
+
+```yaml
+# filesystem directory example
+- url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
+  path: /tmp/minima/repo1
+
+# AWS S3 bucket example
+- url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
+  access_key_id: ACCESS_KEY_ID
+  secret_access_key: SECRET_ACCESS_KEY
+  region: us-east-1
+  bucket: minima-bucket-key
+  archs: [x86_64]
 ```
-Downloads a repository given its URL
 
-Usage:
-  minima get [URL] [flags]
-
-Flags:
-  -a, --archs string       Comma-separated list of archs to include (default "all")
-  -d, --directory string   Destination directory to save the repo (default ".")
-
-Global Flags:
-      --config string   config file (default is $HOME/.minima.yaml)
-```
-
+To sync repositories, use `minima sync`.
 
 ## How to contribute
 
