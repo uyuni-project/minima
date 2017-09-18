@@ -1,3 +1,6 @@
+![Minimal infinitely-growing pattern in Conway's Game of Life](doc/minimal.svg)
+
+
 # minima
 minima is a simple Linux repository manager.
 
