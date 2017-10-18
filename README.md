@@ -6,6 +6,7 @@ minima is a simple Linux repository manager.
 
 Currently, the only implemented functionality is the smart downloading of RPM repos from an HTTP source for mirroring. Downloaded repos can be saved either in a local filesystem directory or an Amazon S3 bucket.
 
+[![Travis CI build status](https://travis-ci.org/moio/minima.svg?branch=master)](https://travis-ci.org/moio/minima)
 
 ## Configuration
 
