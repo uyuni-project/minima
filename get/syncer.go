@@ -77,18 +77,20 @@ func (r *Syncer) StoreRepo() (err error) {
 		return
 	}
 
-	log.Printf("Downloading %v packages...\n", len(packagesToDownload))
-	for _, pack := range packagesToDownload {
-		log.Printf("...%v\n", pack.Location.Href)
+	downloadCount := len(packagesToDownload)
+	log.Printf("Downloading %v packages...\n", downloadCount)
+	for i, pack := range packagesToDownload {
+		log.Printf("...(%d/%d) %v\n", i+1, downloadCount, pack.Location.Href)
 		err = r.downloadStoreApply(pack.Location.Href, pack.Checksum.Checksum, util.Nop)
 		if err != nil {
 			return
 		}
 	}
 
-	log.Printf("Recycling %v packages...\n", len(packagesToRecycle))
-	for _, pack := range packagesToRecycle {
-		log.Printf("...%v\n", pack.Location.Href)
+	recycleCount := len(packagesToRecycle)
+	log.Printf("Recycling %v packages...\n", recycleCount)
+	for i, pack := range packagesToRecycle {
+		log.Printf("...(%d/%d) %v\n", i+1, recycleCount, pack.Location.Href)
 		err = r.storage.Recycle(pack.Location.Href)
 		if err != nil {
 			return
@@ -159,14 +161,14 @@ func (r *Syncer) processPrimary(path string) (packagesToDownload []XMLPackage, p
 				storageChecksum, err := r.storage.Checksum(pack.Location.Href, checksumTypeMap[pack.Checksum.Type])
 				switch {
 				case err == ErrFileNotFound:
-					log.Printf("...package '%v' not found, I will download it\n", pack.Location.Href)
+					log.Printf("...package '%v' not found, will be downloaded\n", pack.Location.Href)
 					packagesToDownload = append(packagesToDownload, pack)
 				case err != nil:
 					log.Printf("Checksum evaluation of the package '%v' returned the following error:\n", pack.Location.Href)
 					log.Printf("Error message: %v\n", err)
 					log.Println("...package skipped")
 				case pack.Checksum.Checksum != storageChecksum:
-					log.Printf("...package '%v' has a checksum error!!\n", pack.Location.Href)
+					log.Printf("...package '%v' has a checksum error, will be redownloaded\n", pack.Location.Href)
 					log.Printf("[repo vs local] = ['%v' VS '%v']\n", pack.Checksum.Checksum, storageChecksum)
 					packagesToDownload = append(packagesToDownload, pack)
 				default:
