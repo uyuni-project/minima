@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"io"
 	"log"
+	"strings"
 
 	"github.com/moio/minima/util"
 )
@@ -135,6 +136,21 @@ func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToR
 		}
 		return
 	})
+	if err != nil {
+		return
+	}
+
+	err = r.downloadStoreApply(repomdPath+".asc", "", util.Nop)
+	if err != nil && !strings.HasSuffix(err.Error(), "404") {
+		return
+	}
+
+	err = r.downloadStoreApply(repomdPath+".key", "", util.Nop)
+	if err != nil && !strings.HasSuffix(err.Error(), "404") {
+		return
+	}
+
+	err = nil
 	return
 }
 
