@@ -63,7 +63,8 @@ func (t *TeeReadCloser) Read(p []byte) (n int, err error) {
 
 // Close closes the internal reader and writer
 func (t *TeeReadCloser) Close() (err error) {
-	ioutil.ReadAll(t.teeReader)
+	// read any remaining bytes from the teeReader (discarding them)
+	io.Copy(ioutil.Discard, t.teeReader)
 	err = t.reader.Close()
 	if err != nil {
 		return
