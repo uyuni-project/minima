@@ -61,10 +61,12 @@ func (t *TeeReadCloser) Read(p []byte) (n int, err error) {
 	return t.teeReader.Read(p)
 }
 
+var discardBuffer = make([]byte, 4*1024*1024)
+
 // Close closes the internal reader and writer
 func (t *TeeReadCloser) Close() (err error) {
 	// read any remaining bytes from the teeReader (discarding them)
-	io.Copy(ioutil.Discard, t.teeReader)
+	io.CopyBuffer(ioutil.Discard, t.teeReader, discardBuffer)
 	err = t.reader.Close()
 	if err != nil {
 		return

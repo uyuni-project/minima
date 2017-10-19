@@ -15,12 +15,13 @@ import (
 
 // FileStorage allows to store data in a local directory
 type FileStorage struct {
-	directory string
+	directory      string
+	checksumBuffer []byte
 }
 
 // NewFileStorage returns a new Storage given a local directory
 func NewFileStorage(directory string) Storage {
-	return &FileStorage{directory}
+	return &FileStorage{directory, make([]byte, 4*1024*1024)}
 }
 
 // Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm
@@ -41,13 +42,13 @@ func (s *FileStorage) Checksum(filename string, checksumType ChecksumType) (chec
 	switch checksumType {
 	case SHA1:
 		h := sha1.New()
-		if _, err = io.Copy(h, f); err != nil {
+		if _, err = io.CopyBuffer(h, f, s.checksumBuffer); err != nil {
 			log.Fatal(err)
 		}
 		checksum = hex.EncodeToString(h.Sum(nil))
 	case SHA256:
 		h := sha256.New()
-		if _, err = io.Copy(h, f); err != nil {
+		if _, err = io.CopyBuffer(h, f, s.checksumBuffer); err != nil {
 			log.Fatal(err)
 		}
 		checksum = hex.EncodeToString(h.Sum(nil))
