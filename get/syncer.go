@@ -80,8 +80,7 @@ func (r *Syncer) StoreRepo() (err error) {
 
 	downloadCount := len(packagesToDownload)
 	log.Printf("Downloading %v packages...\n", downloadCount)
-	for i, pack := range packagesToDownload {
-		log.Printf("...(%d/%d) %v\n", i+1, downloadCount, pack.Location.Href)
+	for _, pack := range packagesToDownload {
 		err = r.downloadStoreApply(pack.Location.Href, pack.Checksum.Checksum, util.Nop)
 		if err != nil {
 			return
@@ -90,8 +89,7 @@ func (r *Syncer) StoreRepo() (err error) {
 
 	recycleCount := len(packagesToRecycle)
 	log.Printf("Recycling %v packages...\n", recycleCount)
-	for i, pack := range packagesToRecycle {
-		log.Printf("...(%d/%d) %v\n", i+1, recycleCount, pack.Location.Href)
+	for _, pack := range packagesToRecycle {
 		err = r.storage.Recycle(pack.Location.Href)
 		if err != nil {
 			return
@@ -106,8 +104,14 @@ func (r *Syncer) StoreRepo() (err error) {
 	return
 }
 
-// downloadStoreApply downloads a URL into a file, while applying a ReaderConsumer
+// downloadStore downloads a repo-relative path into a file
+func (r *Syncer) downloadStore(path string) error {
+	return r.downloadStoreApply(path, "", util.Nop)
+}
+
+// downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
 func (r *Syncer) downloadStoreApply(path string, checksum string, f util.ReaderConsumer) error {
+	log.Printf("Downloading %v...", path)
 	return DownloadApply(r.Url+"/"+path, util.Compose(r.storage.StoringMapper(path, checksum), f))
 }
 
@@ -128,7 +132,7 @@ func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToR
 			if data[i].Type == "primary" {
 				packagesToDownload, packagesToRecycle, err = r.processPrimary(metadataPath)
 			} else {
-				err = r.downloadStoreApply(metadataPath, "", util.Nop)
+				err = r.downloadStore(metadataPath)
 			}
 			if err != nil {
 				return
@@ -140,17 +144,26 @@ func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToR
 		return
 	}
 
-	err = r.downloadStoreApply(repomdPath+".asc", "", util.Nop)
-	if err != nil && !strings.HasSuffix(err.Error(), "404") {
-		return
+	err = r.downloadStore(repomdPath + ".asc")
+	if err != nil {
+		if strings.HasSuffix(err.Error(), "404") {
+			log.Printf("Got 404, ignoring...")
+			err = nil
+		} else {
+			return
+		}
 	}
 
-	err = r.downloadStoreApply(repomdPath+".key", "", util.Nop)
-	if err != nil && !strings.HasSuffix(err.Error(), "404") {
-		return
+	err = r.downloadStore(repomdPath + ".key")
+	if err != nil {
+		if strings.HasSuffix(err.Error(), "404") {
+			log.Printf("Got 404, ignoring...")
+			err = nil
+		} else {
+			return
+		}
 	}
 
-	err = nil
 	return
 }
 
