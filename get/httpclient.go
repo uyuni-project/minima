@@ -2,24 +2,23 @@ package get
 
 import (
 	"fmt"
+	"io"
 	"net/http"
-
-	"github.com/moio/minima/util"
 )
 
-// DownloadApply downloads bytes from an URL and applies a ReaderConsumer function to the result
-func DownloadApply(url string, f util.ReaderConsumer) (err error) {
+// ReadURL returns a Reader for bytes from an http URL
+func ReadURL(url string) (r io.ReadCloser, err error) {
 	response, err := http.Get(url)
 	if err != nil {
 		return
 	}
 
 	if response.StatusCode != 200 {
-		return fmt.Errorf("Got unexpected status code from %s, %d", url, response.StatusCode)
+		err = fmt.Errorf("Got unexpected status code from %s, %d", url, response.StatusCode)
+		return
 	}
 
-	body := response.Body
+	r = response.Body
 
-	err = f(body)
 	return
 }

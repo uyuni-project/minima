@@ -112,7 +112,11 @@ func (r *Syncer) downloadStore(path string) error {
 // downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
 func (r *Syncer) downloadStoreApply(path string, checksum string, f util.ReaderConsumer) error {
 	log.Printf("Downloading %v...", path)
-	return DownloadApply(r.Url+"/"+path, util.Compose(r.storage.StoringMapper(path, checksum), f))
+	body, err := ReadURL(r.Url + "/" + path)
+	if err != nil {
+		return err
+	}
+	return util.Compose(r.storage.StoringMapper(path, checksum), f)(body)
 }
 
 // processMetadata stores the repo metadata and returns a list of package file
