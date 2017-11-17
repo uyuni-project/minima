@@ -15,6 +15,9 @@ script:
 # when tagged
 before_deploy:
   # compile and archive binaries
+  - GOOS=freebsd GOARCH=amd64 go build
+  - tar cvzf minima-freebsd-amd64.tar.gz minima
+  - sha512sum minima-freebsd-amd64.tar.gz > minima-freebsd-amd64.tar.gz.sha512
   - GOOS=darwin GOARCH=amd64 go build
   - tar cvzf minima-darwin-amd64.tar.gz minima
   - sha512sum minima-darwin-amd64.tar.gz > minima-darwin-amd64.tar.gz.sha512
@@ -32,6 +35,8 @@ deploy:
   api_key:
     secure: YcMYC/vWo1HT2zwS8n32QtfxJjuu8PWdopVgMbItKtBkZ6Rq6VZ6iRuYkQ2F+7mLt0fLyyUNX3yyv3iafXecvVGXJkVM1vi63LWzxaCHpNAuVZfjQpv8mlYd5X5OHlFoqGgfBo8eFKXYs5j3AjW96QSehGLN6814ojHTU/2my82YXtsL8g6gy5Pq7D6R+4OcvKhY7xvq/QDz0Zn0GRO8+B4K4yjxn94AmvDnzz48l0ciMu1LHaqdIgt/fhexiiM1pVXdkUtsOsB/hw0kEC/X/qFtGu6YRatXaGlMYIi7sf6rEt6ndHrBKljlrdmsDKnqCHjgw6vsEri0HpPOl+poPnGnzxnuz74qu5T4+xIIEtRorCRnHuRJ/dEIWdAiO6rVwhZuqIQXTkjUlYNta3fMX90a3uMZuoJRj4OiONtLdfuV3RwVlXDNPRSj19+P5iBp1sIQ+iBQWBTe9BMpI2T3332sMT2kJoGgje7zzADRh0gGHWc2icDaXGonMLLJfLIAh3kdnE1f1/uEZncCXQUaS//wWurO6kg5TTrNTete+yA1DNp2npiwk/fvl5b+ZUtC3IcC5lGeE95fGxyymoog79JKQ7/aydjz/bf7SAvKEwbByXw2KyKr/fyU2Jfr52haJ+ZBdvtLY0Isbb3Hf2lAs6/goPRmTT4AUN7ymcH9VvA=
   file:
+    - "minima-freebsd-amd64.tar.gz"
+    - "minima-freebsd-amd64.tar.gz.sha512"
     - "minima-darwin-amd64.tar.gz"
     - "minima-darwin-amd64.tar.gz.sha512"
     - "minima-linux-amd64.tar.gz"
