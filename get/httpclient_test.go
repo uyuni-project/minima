@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"testing"
 )
 
@@ -30,7 +29,13 @@ func TestReadURL(t *testing.T) {
 
 	// 404
 	_, err = ReadURL("http://localhost:8080/not_existing")
-	if !strings.Contains(err.Error(), "404") {
+
+	uerr, unexpected := err.(*UnexpectedStatusCodeError)
+	if !unexpected {
 		t.Error("404 error expected, got ", err)
+	}
+
+	if uerr.StatusCode != 404 {
+		t.Error("404 error expected, got ", uerr.StatusCode)
 	}
 }

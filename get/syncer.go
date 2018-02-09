@@ -5,7 +5,6 @@ import (
 	"encoding/xml"
 	"io"
 	"log"
-	"strings"
 
 	"github.com/moio/minima/util"
 )
@@ -71,8 +70,28 @@ func NewSyncer(url string, archs map[string]bool, storage Storage) *Syncer {
 	return &Syncer{url, archs, storage}
 }
 
-// StoreRepo stores an HTTP repo in a Storage
+// StoreRepo stores an HTTP repo in a Storage, automatically retrying in case of recoverable errors
 func (r *Syncer) StoreRepo() (err error) {
+	for i := 0; i < 10; i++ {
+		err = r.storeRepo()
+		if err == nil {
+			return
+		}
+
+		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
+		if unexpectedStatusCode && uerr.StatusCode == 404 {
+			log.Printf("Got 404, presumably temporarily, retrying...\n")
+		} else {
+			return err
+		}
+	}
+
+	log.Printf("Too many temporary errors, aborting...\n")
+	return err
+}
+
+// StoreRepo stores an HTTP repo in a Storage
+func (r *Syncer) storeRepo() (err error) {
 	packagesToDownload, packagesToRecycle, err := r.processMetadata()
 	if err != nil {
 		return
@@ -83,7 +102,7 @@ func (r *Syncer) StoreRepo() (err error) {
 	for _, pack := range packagesToDownload {
 		err = r.downloadStoreApply(pack.Location.Href, pack.Checksum.Checksum, util.Nop)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
@@ -150,9 +169,9 @@ func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToR
 
 	err = r.downloadStore(repomdPath + ".asc")
 	if err != nil {
-		if strings.HasSuffix(err.Error(), "404") {
+		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
+		if unexpectedStatusCode && uerr.StatusCode == 404 {
 			log.Printf("Got 404, ignoring...")
-			err = nil
 		} else {
 			return
 		}
@@ -160,7 +179,8 @@ func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToR
 
 	err = r.downloadStore(repomdPath + ".key")
 	if err != nil {
-		if strings.HasSuffix(err.Error(), "404") {
+		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
+		if unexpectedStatusCode && uerr.StatusCode == 404 {
 			log.Printf("Got 404, ignoring...")
 			err = nil
 		} else {
