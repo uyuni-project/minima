@@ -1,6 +1,10 @@
 package util
 
 import (
+	"crypto"
+	"encoding/hex"
+	"fmt"
+	"hash"
 	"io"
 	"io/ioutil"
 )
@@ -18,7 +22,9 @@ func Compose(mapper ReaderMapper, f ReaderConsumer) ReaderConsumer {
 		if err != nil {
 			return
 		}
-		defer mappedReader.Close()
+		defer func() {
+			err = mappedReader.Close()
+		}()
 
 		return f(mappedReader)
 	}
@@ -73,4 +79,53 @@ func (t *TeeReadCloser) Close() (err error) {
 	}
 	err = t.writer.Close()
 	return
+}
+
+// ChecksummingWriter is a WriteCloser that checks on close that the checksum matches
+type ChecksummingWriter struct {
+	writer       io.WriteCloser
+	expectedSum  string
+	hashFunction crypto.Hash
+	hash         hash.Hash
+}
+
+// NewChecksummingWriter returns a new ChecksummingWriter
+func NewChecksummingWriter(writer io.WriteCloser, expectedSum string, hashFunction crypto.Hash) *ChecksummingWriter {
+	if hashFunction != 0 {
+		return &ChecksummingWriter{writer, expectedSum, hashFunction, hashFunction.New()}
+	}
+	return &ChecksummingWriter{writer, expectedSum, hashFunction, nil}
+}
+
+// Write delegates to the writer and hash
+func (w *ChecksummingWriter) Write(p []byte) (n int, err error) {
+	if w.hashFunction != 0 {
+		w.hash.Write(p)
+	}
+	return w.writer.Write(p)
+}
+
+// Close delegates to the writer and checks the hash sum
+func (w *ChecksummingWriter) Close() (err error) {
+	err = w.writer.Close()
+	if err != nil {
+		return
+	}
+	if w.hashFunction != 0 {
+		actualSum := hex.EncodeToString(w.hash.Sum(nil))
+		if w.expectedSum != actualSum {
+			err = &ChecksumError{w.expectedSum, actualSum}
+		}
+	}
+	return
+}
+
+// ChecksumError is returned if the expected and actual checksums do not match
+type ChecksumError struct {
+	expected string
+	actual   string
+}
+
+func (e *ChecksumError) Error() string {
+	return fmt.Sprintf("Checksum mismatch: expected %s, actual %s", e.expected, e.actual)
 }

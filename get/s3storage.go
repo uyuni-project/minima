@@ -141,14 +141,15 @@ func (s *S3Storage) newPrefix() string {
 	return "a/"
 }
 
-// Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm
-func (s *S3Storage) Checksum(filename string, hash crypto.Hash) (checksum string, err error) {
-	input := &s3.HeadObjectInput{
+// NewReader returns a Reader for a file in the permanent location, returns ErrFileNotFound
+// if the requested path was not found at all
+func (s *S3Storage) NewReader(filename string) (reader io.ReadCloser, err error) {
+	input := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(s.prefix + filename),
 	}
 
-	info, err := s.svc.HeadObject(input)
+	info, err := s.svc.GetObject(input)
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
@@ -159,11 +160,7 @@ func (s *S3Storage) Checksum(filename string, hash crypto.Hash) (checksum string
 		return
 	}
 
-	if val, ok := info.Metadata["Checksum"]; ok {
-		checksum = *val
-	}
-
-	return
+	return info.Body, err
 }
 
 // StoringMapper returns a mapper that will store read data to a temporary location specified by filename
@@ -179,9 +176,6 @@ func (s *S3Storage) StoringMapper(filename string, checksum string, hash crypto.
 				Bucket: aws.String(s.bucket),
 				Key:    aws.String(s.newPrefix() + filename),
 				Body:   pipeReader,
-				Metadata: map[string]*string{
-					"Checksum": &checksum,
-				},
 			})
 			errs <- err
 		}()

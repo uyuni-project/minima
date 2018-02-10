@@ -45,11 +45,11 @@ func TestStoreRepo(t *testing.T) {
 	for _, file := range expectedFiles {
 		originalInfo, serr := os.Stat(filepath.Join("testdata", "repo", file))
 		if err != nil {
-			t.Error(serr)
+			t.Fatal(serr)
 		}
 		syncedInfo, serr := os.Stat(filepath.Join(directory, file))
 		if serr != nil {
-			t.Error(serr)
+			t.Fatal(serr)
 		}
 		if originalInfo.Size() != syncedInfo.Size() {
 			t.Error("original and synced versions of", file, "differ:", originalInfo.Size(), "vs", syncedInfo.Size())
@@ -61,5 +61,4 @@ func TestStoreRepo(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
 }

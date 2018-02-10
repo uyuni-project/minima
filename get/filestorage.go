@@ -2,10 +2,6 @@ package get
 
 import (
 	"crypto"
-	"crypto/sha1"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
 	"io"
 	"log"
 	"os"
@@ -25,8 +21,9 @@ func NewFileStorage(directory string) Storage {
 	return &FileStorage{directory, make([]byte, 4*1024*1024)}
 }
 
-// Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm
-func (s *FileStorage) Checksum(filename string, hash crypto.Hash) (checksum string, err error) {
+// NewReader returns a Reader for a file in the permanent location, returns ErrFileNotFound
+// if the requested path was not found at all
+func (s *FileStorage) NewReader(filename string) (reader io.ReadCloser, err error) {
 	fullPath := path.Join(s.directory, filename)
 	stat, err := os.Stat(fullPath)
 	if os.IsNotExist(err) || stat == nil {
@@ -38,25 +35,8 @@ func (s *FileStorage) Checksum(filename string, hash crypto.Hash) (checksum stri
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
 
-	switch hash {
-	case crypto.SHA1:
-		h := sha1.New()
-		if _, err = io.CopyBuffer(h, f, s.checksumBuffer); err != nil {
-			log.Fatal(err)
-		}
-		checksum = hex.EncodeToString(h.Sum(nil))
-	case crypto.SHA256:
-		h := sha256.New()
-		if _, err = io.CopyBuffer(h, f, s.checksumBuffer); err != nil {
-			log.Fatal(err)
-		}
-		checksum = hex.EncodeToString(h.Sum(nil))
-	default:
-		err = errors.New("Unknown ChecksumType")
-	}
-	return
+	return f, err
 }
 
 // StoringMapper returns a mapper that will store read data to a temporary location specified by filename
@@ -74,7 +54,7 @@ func (s *FileStorage) StoringMapper(filename string, checksum string, hash crypt
 			return
 		}
 
-		result = util.NewTeeReadCloser(reader, file)
+		result = util.NewTeeReadCloser(reader, util.NewChecksummingWriter(file, checksum, hash))
 		return
 	}
 }

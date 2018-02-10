@@ -3,6 +3,7 @@ package get
 import (
 	"crypto"
 	"errors"
+	"io"
 
 	"github.com/moio/minima/util"
 )
@@ -15,9 +16,9 @@ type Storage interface {
 	StoringMapper(filename string, checksum string, hash crypto.Hash) util.ReaderMapper
 	// Commit moves any temporary file accumulated so far to the permanent location
 	Commit() (err error)
-	// Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm
-	// returns ErrFileNotFound if the requested path was not found at all
-	Checksum(filename string, hash crypto.Hash) (checksum string, err error)
+	// NewReader returns a Reader for a file in the permanent location, returns ErrFileNotFound
+	// if the requested path was not found at all
+	NewReader(filename string) (reader io.ReadCloser, err error)
 	// Recycle will copy a file from the permanent to the temporary location
 	Recycle(filename string) (err error)
 }

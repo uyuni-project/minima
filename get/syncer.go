@@ -73,15 +73,25 @@ func NewSyncer(url string, archs map[string]bool, storage Storage) *Syncer {
 
 // StoreRepo stores an HTTP repo in a Storage, automatically retrying in case of recoverable errors
 func (r *Syncer) StoreRepo() (err error) {
+	checksumMap := r.readChecksumMap()
 	for i := 0; i < 10; i++ {
-		err = r.storeRepo()
+		err = r.storeRepo(checksumMap)
 		if err == nil {
 			return
 		}
 
 		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
-		if unexpectedStatusCode && uerr.StatusCode == 404 {
-			log.Printf("Got 404, presumably temporarily, retrying...\n")
+		if unexpectedStatusCode {
+			if uerr.StatusCode == 404 {
+				log.Printf("Got 404, presumably temporarily, retrying...\n")
+			} else {
+				return err
+			}
+		}
+
+		_, checksumError := err.(*util.ChecksumError)
+		if checksumError {
+			log.Printf("Checksum did not match, presumably the repo was published while syncing, retrying...\n")
 		} else {
 			return err
 		}
@@ -92,8 +102,8 @@ func (r *Syncer) StoreRepo() (err error) {
 }
 
 // StoreRepo stores an HTTP repo in a Storage
-func (r *Syncer) storeRepo() (err error) {
-	packagesToDownload, packagesToRecycle, err := r.processMetadata()
+func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
+	packagesToDownload, packagesToRecycle, err := r.processMetadata(checksumMap)
 	if err != nil {
 		return
 	}
@@ -136,12 +146,13 @@ func (r *Syncer) downloadStoreApply(path string, checksum string, hash crypto.Ha
 	if err != nil {
 		return err
 	}
+
 	return util.Compose(r.storage.StoringMapper(path, checksum, hash), f)(body)
 }
 
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
-func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
+func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
 	err = r.downloadStoreApply(repomdPath, "", 0, func(reader io.ReadCloser) (err error) {
 		decoder := xml.NewDecoder(reader)
 		var repomd XMLRepomd
@@ -154,7 +165,7 @@ func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToR
 		for i := 0; i < len(data); i++ {
 			metadataPath := data[i].Location.Href
 			if data[i].Type == "primary" {
-				packagesToDownload, packagesToRecycle, err = r.processPrimary(metadataPath)
+				packagesToDownload, packagesToRecycle, err = r.processPrimary(metadataPath, checksumMap)
 			} else {
 				err = r.downloadStore(metadataPath)
 			}
@@ -192,19 +203,67 @@ func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToR
 	return
 }
 
+func (r *Syncer) readMetaData(reader io.Reader) (primary XMLMetaData, err error) {
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		return
+	}
+	defer gzReader.Close()
+
+	decoder := xml.NewDecoder(gzReader)
+	err = decoder.Decode(&primary)
+
+	return
+}
+
+func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
+	checksumMap = make(map[string]XMLChecksum)
+	repomdReader, err := r.storage.NewReader(repomdPath)
+	if err != nil {
+		if err == ErrFileNotFound {
+			log.Println("First-time sync started")
+		} else {
+			log.Println(err.Error())
+			log.Println("Error while reading previously-downloaded metadata. Starting sync from scratch")
+		}
+		return
+	}
+	defer repomdReader.Close()
+
+	decoder := xml.NewDecoder(repomdReader)
+	var repomd XMLRepomd
+	err = decoder.Decode(&repomd)
+	if err != nil {
+		log.Println(err.Error())
+		log.Println("Error while parsing previously-downloaded metadata. Starting sync from scratch")
+		return
+	}
+
+	data := repomd.Data
+	for i := 0; i < len(data); i++ {
+		metadataPath := data[i].Location.Href
+		if data[i].Type == "primary" {
+			primaryReader, err := r.storage.NewReader(metadataPath)
+			if err != nil {
+				return
+			}
+			primary, err := r.readMetaData(primaryReader)
+			if err != nil {
+				return
+			}
+			for _, pack := range primary.Packages {
+				checksumMap[pack.Location.Href] = pack.Checksum
+			}
+		}
+	}
+	return
+}
+
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
-func (r *Syncer) processPrimary(path string) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
+func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
 	err = r.downloadStoreApply(path, "", 0, func(reader io.ReadCloser) (err error) {
-		gzReader, err := gzip.NewReader(reader)
-		if err != nil {
-			return
-		}
-		defer gzReader.Close()
-
-		decoder := xml.NewDecoder(gzReader)
-		var primary XMLMetaData
-		err = decoder.Decode(&primary)
+		primary, err := r.readMetaData(reader)
 		if err != nil {
 			return
 		}
@@ -212,22 +271,17 @@ func (r *Syncer) processPrimary(path string) (packagesToDownload []XMLPackage, p
 		allArchs := len(r.archs) == 0
 		for _, pack := range primary.Packages {
 			if allArchs || pack.Arch == "noarch" || r.archs[pack.Arch] {
-				storageChecksum, err := r.storage.Checksum(pack.Location.Href, hashMap[pack.Checksum.Type])
+				previousChecksum, ok := checksumMap[pack.Location.Href]
 				switch {
-				case err == ErrFileNotFound:
+				case !ok:
 					log.Printf("...package '%v' not found, will be downloaded\n", pack.Location.Href)
 					packagesToDownload = append(packagesToDownload, pack)
-				case err != nil:
-					log.Printf("Checksum evaluation of the package '%v' returned the following error:\n", pack.Location.Href)
-					log.Printf("Error message: %v\n", err)
-					log.Println("...package skipped")
-				case pack.Checksum.Checksum != storageChecksum:
-					log.Printf("...package '%v' has a checksum error, will be redownloaded\n", pack.Location.Href)
-					log.Printf("[repo vs local] = ['%v' VS '%v']\n", pack.Checksum.Checksum, storageChecksum)
-					packagesToDownload = append(packagesToDownload, pack)
-				default:
+				case previousChecksum.Type == pack.Checksum.Type && previousChecksum.Checksum == pack.Checksum.Checksum:
 					log.Printf("...package '%v' is up-to-date already, will be recycled\n", pack.Location.Href)
 					packagesToRecycle = append(packagesToRecycle, pack)
+				default:
+					log.Printf("...package '%v' does not have the expected checksum, will be redownloaded\n", pack.Location.Href)
+					packagesToDownload = append(packagesToDownload, pack)
 				}
 			}
 		}
