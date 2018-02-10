@@ -167,7 +167,7 @@ func (s *S3Storage) Checksum(filename string, hash crypto.Hash) (checksum string
 }
 
 // StoringMapper returns a mapper that will store read data to a temporary location specified by filename
-func (s *S3Storage) StoringMapper(filename string, checksum string) (mapper util.ReaderMapper) {
+func (s *S3Storage) StoringMapper(filename string, checksum string, hash crypto.Hash) (mapper util.ReaderMapper) {
 	return func(reader io.ReadCloser) (result io.ReadCloser, err error) {
 		uploader := s3manager.NewUploaderWithClient(s.svc)
 

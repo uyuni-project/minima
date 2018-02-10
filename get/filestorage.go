@@ -60,7 +60,7 @@ func (s *FileStorage) Checksum(filename string, hash crypto.Hash) (checksum stri
 }
 
 // StoringMapper returns a mapper that will store read data to a temporary location specified by filename
-func (s *FileStorage) StoringMapper(filename string, checksum string) util.ReaderMapper {
+func (s *FileStorage) StoringMapper(filename string, checksum string, hash crypto.Hash) util.ReaderMapper {
 	return func(reader io.ReadCloser) (result io.ReadCloser, err error) {
 		fullPath := path.Join(s.directory+"-in-progress", filename)
 		// attempt to create any missing directories in the full path

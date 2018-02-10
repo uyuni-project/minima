@@ -12,7 +12,7 @@ import (
 // temporary location is moved in the "permanent" location
 type Storage interface {
 	// StoringMapper returns a mapper that will store read data to a temporary location specified by filename
-	StoringMapper(filename string, checksum string) util.ReaderMapper
+	StoringMapper(filename string, checksum string, hash crypto.Hash) util.ReaderMapper
 	// Commit moves any temporary file accumulated so far to the permanent location
 	Commit() (err error)
 	// Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm

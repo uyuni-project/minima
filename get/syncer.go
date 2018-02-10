@@ -101,7 +101,7 @@ func (r *Syncer) storeRepo() (err error) {
 	downloadCount := len(packagesToDownload)
 	log.Printf("Downloading %v packages...\n", downloadCount)
 	for _, pack := range packagesToDownload {
-		err = r.downloadStoreApply(pack.Location.Href, pack.Checksum.Checksum, util.Nop)
+		err = r.downloadStoreApply(pack.Location.Href, pack.Checksum.Checksum, hashMap[pack.Checksum.Type], util.Nop)
 		if err != nil {
 			return err
 		}
@@ -126,23 +126,23 @@ func (r *Syncer) storeRepo() (err error) {
 
 // downloadStore downloads a repo-relative path into a file
 func (r *Syncer) downloadStore(path string) error {
-	return r.downloadStoreApply(path, "", util.Nop)
+	return r.downloadStoreApply(path, "", 0, util.Nop)
 }
 
 // downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
-func (r *Syncer) downloadStoreApply(path string, checksum string, f util.ReaderConsumer) error {
+func (r *Syncer) downloadStoreApply(path string, checksum string, hash crypto.Hash, f util.ReaderConsumer) error {
 	log.Printf("Downloading %v...", path)
 	body, err := ReadURL(r.Url + "/" + path)
 	if err != nil {
 		return err
 	}
-	return util.Compose(r.storage.StoringMapper(path, checksum), f)(body)
+	return util.Compose(r.storage.StoringMapper(path, checksum, hash), f)(body)
 }
 
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
 func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
-	err = r.downloadStoreApply(repomdPath, "", func(reader io.ReadCloser) (err error) {
+	err = r.downloadStoreApply(repomdPath, "", 0, func(reader io.ReadCloser) (err error) {
 		decoder := xml.NewDecoder(reader)
 		var repomd XMLRepomd
 		err = decoder.Decode(&repomd)
@@ -195,7 +195,7 @@ func (r *Syncer) processMetadata() (packagesToDownload []XMLPackage, packagesToR
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
 func (r *Syncer) processPrimary(path string) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
-	err = r.downloadStoreApply(path, "", func(reader io.ReadCloser) (err error) {
+	err = r.downloadStoreApply(path, "", 0, func(reader io.ReadCloser) (err error) {
 		gzReader, err := gzip.NewReader(reader)
 		if err != nil {
 			return
