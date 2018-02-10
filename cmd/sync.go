@@ -40,7 +40,7 @@ var syncCmd = &cobra.Command{
 			log.Printf("Processing repo: %s", syncer.Url)
 			err := syncer.StoreRepo()
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
 			} else {
 				log.Println("...done.")
 			}
