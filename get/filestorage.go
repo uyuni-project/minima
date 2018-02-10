@@ -1,6 +1,7 @@
 package get
 
 import (
+	"crypto"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
@@ -25,7 +26,7 @@ func NewFileStorage(directory string) Storage {
 }
 
 // Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm
-func (s *FileStorage) Checksum(filename string, checksumType ChecksumType) (checksum string, err error) {
+func (s *FileStorage) Checksum(filename string, hash crypto.Hash) (checksum string, err error) {
 	fullPath := path.Join(s.directory, filename)
 	stat, err := os.Stat(fullPath)
 	if os.IsNotExist(err) || stat == nil {
@@ -39,14 +40,14 @@ func (s *FileStorage) Checksum(filename string, checksumType ChecksumType) (chec
 	}
 	defer f.Close()
 
-	switch checksumType {
-	case SHA1:
+	switch hash {
+	case crypto.SHA1:
 		h := sha1.New()
 		if _, err = io.CopyBuffer(h, f, s.checksumBuffer); err != nil {
 			log.Fatal(err)
 		}
 		checksum = hex.EncodeToString(h.Sum(nil))
-	case SHA256:
+	case crypto.SHA256:
 		h := sha256.New()
 		if _, err = io.CopyBuffer(h, f, s.checksumBuffer); err != nil {
 			log.Fatal(err)

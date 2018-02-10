@@ -1,6 +1,7 @@
 package get
 
 import (
+	"crypto"
 	"errors"
 	"io"
 	"log"
@@ -141,7 +142,7 @@ func (s *S3Storage) newPrefix() string {
 }
 
 // Checksum returns the checksum value of a file in the permanent location, according to the checksumType algorithm
-func (s *S3Storage) Checksum(filename string, checksumType ChecksumType) (checksum string, err error) {
+func (s *S3Storage) Checksum(filename string, hash crypto.Hash) (checksum string, err error) {
 	input := &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(s.prefix + filename),

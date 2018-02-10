@@ -2,6 +2,7 @@ package get
 
 import (
 	"compress/gzip"
+	"crypto"
 	"encoding/xml"
 	"io"
 	"log"
@@ -49,10 +50,10 @@ type XMLChecksum struct {
 	Checksum string `xml:",cdata"`
 }
 
-var checksumTypeMap = map[string]ChecksumType{
-	"sha":    SHA1,
-	"sha1":   SHA1,
-	"sha256": SHA256,
+var hashMap = map[string]crypto.Hash{
+	"sha":    crypto.SHA1,
+	"sha1":   crypto.SHA1,
+	"sha256": crypto.SHA256,
 }
 
 const repomdPath = "repodata/repomd.xml"
@@ -211,7 +212,7 @@ func (r *Syncer) processPrimary(path string) (packagesToDownload []XMLPackage, p
 		allArchs := len(r.archs) == 0
 		for _, pack := range primary.Packages {
 			if allArchs || pack.Arch == "noarch" || r.archs[pack.Arch] {
-				storageChecksum, err := r.storage.Checksum(pack.Location.Href, checksumTypeMap[pack.Checksum.Type])
+				storageChecksum, err := r.storage.Checksum(pack.Location.Href, hashMap[pack.Checksum.Type])
 				switch {
 				case err == ErrFileNotFound:
 					log.Printf("...package '%v' not found, will be downloaded\n", pack.Location.Href)
