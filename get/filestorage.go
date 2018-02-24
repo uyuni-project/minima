@@ -12,13 +12,12 @@ import (
 
 // FileStorage allows to store data in a local directory
 type FileStorage struct {
-	directory      string
-	checksumBuffer []byte
+	directory string
 }
 
 // NewFileStorage returns a new Storage given a local directory
 func NewFileStorage(directory string) Storage {
-	return &FileStorage{directory, make([]byte, 4*1024*1024)}
+	return &FileStorage{directory}
 }
 
 // NewReader returns a Reader for a file in a location, returns ErrFileNotFound
