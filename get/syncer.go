@@ -28,6 +28,7 @@ type XMLRepomd struct {
 type XMLData struct {
 	Type     string      `xml:"type,attr"`
 	Location XMLLocation `xml:"location"`
+	Checksum XMLChecksum `xml:"checksum"`
 }
 
 // repodata/<ID>-primary.xml.gz
@@ -241,9 +242,11 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 
 	data := repomd.Data
 	for i := 0; i < len(data); i++ {
-		metadataPath := data[i].Location.Href
+		dataHref := data[i].Location.Href
+		dataChecksum := data[i].Checksum
+		checksumMap[dataHref] = dataChecksum
 		if data[i].Type == "primary" {
-			primaryReader, err := r.storage.NewReader(metadataPath, Permanent)
+			primaryReader, err := r.storage.NewReader(dataHref, Permanent)
 			if err != nil {
 				return
 			}
