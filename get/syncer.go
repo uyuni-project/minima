@@ -164,14 +164,21 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 
 		data := repomd.Data
 		for i := 0; i < len(data); i++ {
-			metadataPath := data[i].Location.Href
-			if data[i].Type == "primary" {
-				packagesToDownload, packagesToRecycle, err = r.processPrimary(metadataPath, checksumMap)
-			} else {
-				err = r.downloadStore(metadataPath)
+			metadataLocation := data[i].Location.Href
+			metadataChecksum := data[i].Checksum
+			decision := r.decide(metadataLocation, metadataChecksum, checksumMap)
+			switch decision {
+			case Download:
+				err = r.downloadStore(metadataLocation)
+				if err != nil {
+					return
+				}
+			case Recycle:
+				r.storage.Recycle(metadataLocation)
 			}
-			if err != nil {
-				return
+
+			if data[i].Type == "primary" {
+				packagesToDownload, packagesToRecycle, err = r.processPrimary(metadataLocation, checksumMap)
 			}
 		}
 		return
@@ -265,37 +272,59 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
 func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
-	err = r.downloadStoreApply(path, "", 0, func(reader io.ReadCloser) (err error) {
-		primary, err := r.readMetaData(reader)
-		if err != nil {
-			return
-		}
+	reader, err := r.storage.NewReader(path, Temporary)
+	if err != nil {
+		return
+	}
+	primary, err := r.readMetaData(reader)
+	if err != nil {
+		return
+	}
 
-		allArchs := len(r.archs) == 0
-		for _, pack := range primary.Packages {
-			if allArchs || pack.Arch == "noarch" || r.archs[pack.Arch] {
-				previousChecksum, foundInPermanentLocation := checksumMap[pack.Location.Href]
-				if !foundInPermanentLocation || previousChecksum.Type != pack.Checksum.Type || previousChecksum.Checksum != pack.Checksum.Checksum {
-					reader, err := r.storage.NewReader(pack.Location.Href, Temporary)
-					if err != nil {
-						log.Printf("...package '%v' not found or not recyclable, will be downloaded\n", pack.Location.Href)
-						packagesToDownload = append(packagesToDownload, pack)
-					} else {
-						checksum, err := util.Checksum(reader, hashMap[pack.Checksum.Type])
-						if err != nil || checksum != pack.Checksum.Checksum {
-							log.Printf("...package '%v' found in partially-downloaded repo, not recyclable, will be re-downloaded\n", pack.Location.Href)
-							packagesToDownload = append(packagesToDownload, pack)
-						} else {
-							log.Printf("...package '%v' found in partially-downloaded repo, recyclable, will be skipped\n", pack.Location.Href)
-						}
-					}
-				} else {
-					log.Printf("...package '%v' found in already-downloaded repo, recyclable, will be recycled\n", pack.Location.Href)
-					packagesToRecycle = append(packagesToRecycle, pack)
-				}
+	allArchs := len(r.archs) == 0
+	for _, pack := range primary.Packages {
+		if allArchs || pack.Arch == "noarch" || r.archs[pack.Arch] {
+			decision := r.decide(pack.Location.Href, pack.Checksum, checksumMap)
+			switch decision {
+			case Download:
+				packagesToDownload = append(packagesToDownload, pack)
+			case Recycle:
+				packagesToRecycle = append(packagesToRecycle, pack)
 			}
 		}
-		return
-	})
+	}
 	return
+}
+
+// Decision encodes what to do with a file
+type Decision int
+
+const (
+	// Download means the Syncer will download a file
+	Download Decision = iota
+	// Recycle means the Syncer will copy an existing file without downloading
+	Recycle
+	// Skip means the Syncer detected an already-existing file and has nothing to do
+	Skip
+)
+
+func (r *Syncer) decide(location string, checksum XMLChecksum, checksumMap map[string]XMLChecksum) Decision {
+	previousChecksum, foundInPermanentLocation := checksumMap[location]
+	if !foundInPermanentLocation || previousChecksum.Type != checksum.Type || previousChecksum.Checksum != checksum.Checksum {
+		reader, err := r.storage.NewReader(location, Temporary)
+		if err != nil {
+			log.Printf("...'%v' not found or not recyclable, will be downloaded\n", location)
+			return Download
+		}
+		defer reader.Close()
+		readChecksum, err := util.Checksum(reader, hashMap[checksum.Type])
+		if err != nil || readChecksum != checksum.Checksum {
+			log.Printf("...'%v' found in partially-downloaded repo, not recyclable, will be re-downloaded\n", location)
+			return Download
+		}
+		log.Printf("...'%v' found in partially-downloaded repo, recyclable, will be skipped\n", location)
+		return Skip
+	}
+	log.Printf("...'%v' found in already-downloaded repo, recyclable, will be recycled\n", location)
+	return Recycle
 }
