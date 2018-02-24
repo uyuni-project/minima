@@ -129,3 +129,15 @@ type ChecksumError struct {
 func (e *ChecksumError) Error() string {
 	return fmt.Sprintf("Checksum mismatch: expected %s, actual %s", e.expected, e.actual)
 }
+
+// Checksum returns the checksum value from a Reader
+func Checksum(reader io.ReadCloser, hash crypto.Hash) (checksum string, err error) {
+	checksumBuffer := make([]byte, 4*1024*1024)
+
+	h := hash.New()
+	if _, err = io.CopyBuffer(h, reader, checksumBuffer); err != nil {
+		return
+	}
+	checksum = hex.EncodeToString(h.Sum(nil))
+	return
+}

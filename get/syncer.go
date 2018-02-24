@@ -271,17 +271,24 @@ func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum)
 		allArchs := len(r.archs) == 0
 		for _, pack := range primary.Packages {
 			if allArchs || pack.Arch == "noarch" || r.archs[pack.Arch] {
-				previousChecksum, ok := checksumMap[pack.Location.Href]
-				switch {
-				case !ok:
-					log.Printf("...package '%v' not found, will be downloaded\n", pack.Location.Href)
-					packagesToDownload = append(packagesToDownload, pack)
-				case previousChecksum.Type == pack.Checksum.Type && previousChecksum.Checksum == pack.Checksum.Checksum:
-					log.Printf("...package '%v' is up-to-date already, will be recycled\n", pack.Location.Href)
+				previousChecksum, foundInPermanentLocation := checksumMap[pack.Location.Href]
+				if !foundInPermanentLocation || previousChecksum.Type != pack.Checksum.Type || previousChecksum.Checksum != pack.Checksum.Checksum {
+					reader, err := r.storage.NewReader(pack.Location.Href, Temporary)
+					if err != nil {
+						log.Printf("...package '%v' not found or not recyclable, will be downloaded\n", pack.Location.Href)
+						packagesToDownload = append(packagesToDownload, pack)
+					} else {
+						checksum, err := util.Checksum(reader, hashMap[pack.Checksum.Type])
+						if err != nil || checksum != pack.Checksum.Checksum {
+							log.Printf("...package '%v' found in partially-downloaded repo, not recyclable, will be re-downloaded\n", pack.Location.Href)
+							packagesToDownload = append(packagesToDownload, pack)
+						} else {
+							log.Printf("...package '%v' found in partially-downloaded repo, recyclable, will be skipped\n", pack.Location.Href)
+						}
+					}
+				} else {
+					log.Printf("...package '%v' found in already-downloaded repo, recyclable, will be recycled\n", pack.Location.Href)
 					packagesToRecycle = append(packagesToRecycle, pack)
-				default:
-					log.Printf("...package '%v' does not have the expected checksum, will be redownloaded\n", pack.Location.Href)
-					packagesToDownload = append(packagesToDownload, pack)
 				}
 			}
 		}
