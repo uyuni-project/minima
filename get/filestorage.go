@@ -21,10 +21,16 @@ func NewFileStorage(directory string) Storage {
 	return &FileStorage{directory, make([]byte, 4*1024*1024)}
 }
 
-// NewReader returns a Reader for a file in the permanent location, returns ErrFileNotFound
+// NewReader returns a Reader for a file in a location, returns ErrFileNotFound
 // if the requested path was not found at all
-func (s *FileStorage) NewReader(filename string) (reader io.ReadCloser, err error) {
-	fullPath := path.Join(s.directory, filename)
+func (s *FileStorage) NewReader(filename string, location Location) (reader io.ReadCloser, err error) {
+	var prefix string
+	if location == Permanent {
+		prefix = ""
+	} else {
+		prefix = "-in-progress"
+	}
+	fullPath := path.Join(s.directory+prefix, filename)
 	stat, err := os.Stat(fullPath)
 	if os.IsNotExist(err) || stat == nil {
 		err = ErrFileNotFound

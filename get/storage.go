@@ -8,6 +8,16 @@ import (
 	"github.com/moio/minima/util"
 )
 
+// Location represents a directory in a Storage object
+type Location int
+
+const (
+	// Permanent represents a location for fully and correctly synced repos
+	Permanent Location = iota
+	// Temporary represents a temporary location while downloading
+	Temporary
+)
+
 // Storage allows to store data in the form of files. Files are accumulated in
 // a "temporary" location until Commit is called at that point any file in the
 // temporary location is moved in the "permanent" location
@@ -16,9 +26,9 @@ type Storage interface {
 	StoringMapper(filename string, checksum string, hash crypto.Hash) util.ReaderMapper
 	// Commit moves any temporary file accumulated so far to the permanent location
 	Commit() (err error)
-	// NewReader returns a Reader for a file in the permanent location, returns ErrFileNotFound
+	// NewReader returns a Reader for a file in a location, returns ErrFileNotFound
 	// if the requested path was not found at all
-	NewReader(filename string) (reader io.ReadCloser, err error)
+	NewReader(filename string, location Location) (reader io.ReadCloser, err error)
 	// Recycle will copy a file from the permanent to the temporary location
 	Recycle(filename string) (err error)
 }

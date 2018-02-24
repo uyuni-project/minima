@@ -141,12 +141,18 @@ func (s *S3Storage) newPrefix() string {
 	return "a/"
 }
 
-// NewReader returns a Reader for a file in the permanent location, returns ErrFileNotFound
+// NewReader returns a Reader for a file in a location, returns ErrFileNotFound
 // if the requested path was not found at all
-func (s *S3Storage) NewReader(filename string) (reader io.ReadCloser, err error) {
+func (s *S3Storage) NewReader(filename string, location Location) (reader io.ReadCloser, err error) {
+	var prefix string
+	if location == Permanent {
+		prefix = s.prefix
+	} else {
+		prefix = s.newPrefix()
+	}
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
-		Key:    aws.String(s.prefix + filename),
+		Key:    aws.String(prefix + filename),
 	}
 
 	info, err := s.svc.GetObject(input)

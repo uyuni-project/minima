@@ -218,7 +218,7 @@ func (r *Syncer) readMetaData(reader io.Reader) (primary XMLMetaData, err error)
 
 func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 	checksumMap = make(map[string]XMLChecksum)
-	repomdReader, err := r.storage.NewReader(repomdPath)
+	repomdReader, err := r.storage.NewReader(repomdPath, Permanent)
 	if err != nil {
 		if err == ErrFileNotFound {
 			log.Println("First-time sync started")
@@ -243,7 +243,7 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 	for i := 0; i < len(data); i++ {
 		metadataPath := data[i].Location.Href
 		if data[i].Type == "primary" {
-			primaryReader, err := r.storage.NewReader(metadataPath)
+			primaryReader, err := r.storage.NewReader(metadataPath, Permanent)
 			if err != nil {
 				return
 			}
