@@ -75,7 +75,7 @@ func NewSyncer(url string, archs map[string]bool, storage Storage) *Syncer {
 // StoreRepo stores an HTTP repo in a Storage, automatically retrying in case of recoverable errors
 func (r *Syncer) StoreRepo() (err error) {
 	checksumMap := r.readChecksumMap()
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 20; i++ {
 		err = r.storeRepo(checksumMap)
 		if err == nil {
 			return
