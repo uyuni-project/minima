@@ -4,8 +4,10 @@ import (
 	"compress/gzip"
 	"crypto"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"log"
+	"path"
 
 	"github.com/moio/minima/util"
 )
@@ -92,6 +94,7 @@ func (r *Syncer) StoreRepo() (err error) {
 
 		_, checksumError := err.(*util.ChecksumError)
 		if checksumError {
+			log.Printf(err.Error())
 			log.Printf("Checksum did not match, presumably the repo was published while syncing, retrying...\n")
 		} else {
 			return err
@@ -111,8 +114,9 @@ func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
 
 	downloadCount := len(packagesToDownload)
 	log.Printf("Downloading %v packages...\n", downloadCount)
-	for _, pack := range packagesToDownload {
-		err = r.downloadStoreApply(pack.Location.Href, pack.Checksum.Checksum, hashMap[pack.Checksum.Type], util.Nop)
+	for i, pack := range packagesToDownload {
+		description := fmt.Sprintf("(%v/%v) %v", i+1, downloadCount, path.Base(pack.Location.Href))
+		err = r.downloadStoreApply(pack.Location.Href, pack.Checksum.Checksum, description, hashMap[pack.Checksum.Type], util.Nop)
 		if err != nil {
 			return err
 		}
@@ -136,13 +140,13 @@ func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
 }
 
 // downloadStore downloads a repo-relative path into a file
-func (r *Syncer) downloadStore(path string) error {
-	return r.downloadStoreApply(path, "", 0, util.Nop)
+func (r *Syncer) downloadStore(path string, description string) error {
+	return r.downloadStoreApply(path, "", description, 0, util.Nop)
 }
 
 // downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
-func (r *Syncer) downloadStoreApply(path string, checksum string, hash crypto.Hash, f util.ReaderConsumer) error {
-	log.Printf("Downloading %v...", path)
+func (r *Syncer) downloadStoreApply(path string, checksum string, description string, hash crypto.Hash, f util.ReaderConsumer) error {
+	log.Printf("Downloading %v...", description)
 	body, err := ReadURL(r.Url + "/" + path)
 	if err != nil {
 		return err
@@ -154,7 +158,7 @@ func (r *Syncer) downloadStoreApply(path string, checksum string, hash crypto.Ha
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
 func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
-	err = r.downloadStoreApply(repomdPath, "", 0, func(reader io.ReadCloser) (err error) {
+	err = r.downloadStoreApply(repomdPath, "", path.Base(repomdPath), 0, func(reader io.ReadCloser) (err error) {
 		decoder := xml.NewDecoder(reader)
 		var repomd XMLRepomd
 		err = decoder.Decode(&repomd)
@@ -169,7 +173,7 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 			decision := r.decide(metadataLocation, metadataChecksum, checksumMap)
 			switch decision {
 			case Download:
-				err = r.downloadStore(metadataLocation)
+				err = r.downloadStore(metadataLocation, path.Base(metadataLocation))
 				if err != nil {
 					return
 				}
@@ -187,7 +191,8 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 		return
 	}
 
-	err = r.downloadStore(repomdPath + ".asc")
+	ascPath := repomdPath + ".asc"
+	err = r.downloadStore(ascPath, path.Base(ascPath))
 	if err != nil {
 		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
 		if unexpectedStatusCode && uerr.StatusCode == 404 {
@@ -197,7 +202,8 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 		}
 	}
 
-	err = r.downloadStore(repomdPath + ".key")
+	keyPath := repomdPath + ".key"
+	err = r.downloadStore(keyPath, path.Base(keyPath))
 	if err != nil {
 		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
 		if unexpectedStatusCode && uerr.StatusCode == 404 {
@@ -313,18 +319,14 @@ func (r *Syncer) decide(location string, checksum XMLChecksum, checksumMap map[s
 	if !foundInPermanentLocation || previousChecksum.Type != checksum.Type || previousChecksum.Checksum != checksum.Checksum {
 		reader, err := r.storage.NewReader(location, Temporary)
 		if err != nil {
-			log.Printf("...'%v' not found or not recyclable, will be downloaded\n", location)
 			return Download
 		}
 		defer reader.Close()
 		readChecksum, err := util.Checksum(reader, hashMap[checksum.Type])
 		if err != nil || readChecksum != checksum.Checksum {
-			log.Printf("...'%v' found in partially-downloaded repo, not recyclable, will be re-downloaded\n", location)
 			return Download
 		}
-		log.Printf("...'%v' found in partially-downloaded repo, recyclable, will be skipped\n", location)
 		return Skip
 	}
-	log.Printf("...'%v' found in already-downloaded repo, recyclable, will be recycled\n", location)
 	return Recycle
 }
