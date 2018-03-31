@@ -36,7 +36,15 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	// first, try from the commandline flag
+	// first, try via environment variable
+	ev := os.Getenv("MINIMA_CONFIG")
+	if ev != "" {
+		cfgString = ev
+		fmt.Println("Using configuration from $MINIMA_CONFIG")
+		return
+	}
+
+	// second, try from the commandline flag
 	if cfgFile != "" {
 		bytes, err := ioutil.ReadFile(cfgFile)
 		if err != nil {
@@ -47,20 +55,5 @@ func initConfig() {
 		return
 	}
 
-	// second, try via environment variable
-	ev := os.Getenv("MINIMA_CONFIG")
-	if ev != "" {
-		cfgString = ev
-		fmt.Println("Using configuration from $MINIMA_CONFIG")
-		return
-	}
-
-	// third, try with minima.yaml
-	bytes, err := ioutil.ReadFile("minima.yaml")
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfgString = string(bytes)
-	fmt.Println("Using config file:", cfgFile)
 	return
 }
