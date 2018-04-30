@@ -173,7 +173,7 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 			decision := r.decide(metadataLocation, metadataChecksum, checksumMap)
 			switch decision {
 			case Download:
-				err = r.downloadStore(metadataLocation, path.Base(metadataLocation))
+				err = r.downloadStoreApply(metadataLocation, metadataChecksum.Checksum, path.Base(metadataLocation), hashMap[metadataChecksum.Type], util.Nop)
 				if err != nil {
 					return
 				}
