@@ -12,20 +12,26 @@ Currently, the only implemented functionality is the smart downloading of RPM re
 
 You can specify configuration in YAML either in a file (by default `minima.yaml`) or the `MINIMA_CONFIG` environment variable.
 
-
-An example `minima.yaml` is below:
-
+A directory-based example `minima.yaml` is below:
 ```yaml
-# filesystem directory example
-- url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
-  path: /tmp/minima/repo1
+storage:
+  type: file
+  path: /srv/mirror
 
-# AWS S3 bucket example
-- url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
+http:
+  - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
+```
+
+An s3-based example `minima.yaml` is below:
+```yaml
+storage:
+  type: s3
   access_key_id: ACCESS_KEY_ID
   secret_access_key: SECRET_ACCESS_KEY
   region: us-east-1
   bucket: minima-bucket-key
+
+- url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
   archs: [x86_64]
 ```
 

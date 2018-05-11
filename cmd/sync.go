@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"net/url"
+	"path/filepath"
 
 	"github.com/moio/minima/get"
-	"github.com/smallfish/simpleyaml"
 	"github.com/spf13/cobra"
+	yaml "gopkg.in/yaml.v2"
 )
 
 // syncCmd represents the sync command
@@ -17,18 +19,23 @@ var syncCmd = &cobra.Command{
 
   You can specify configuration in YAML either in a file or the MINIMA_CONFIG environment variable.
 
-  An example minima.yaml is below:
+  A directory-based example minima.yaml is below:
+    storage:
+      type: file
+      path: /srv/mirror
 
-    # filesystem directory example
-    - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
-      path: /tmp/minima/repo1
+    http:
+      - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
 
-    # AWS S3 bucket example
-    - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
+  An s3-based example minima.yaml is below:
+    storage:
+      type: s3
       access_key_id: ACCESS_KEY_ID
       secret_access_key: SECRET_ACCESS_KEY
       region: us-east-1
       bucket: minima-bucket-key
+
+    - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
       archs: [x86_64]
   `,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -48,83 +55,57 @@ var syncCmd = &cobra.Command{
 	},
 }
 
-func syncersFromConfig(config string) (result []*get.Syncer, err error) {
-	yaml, err := simpleyaml.NewYaml([]byte(config))
-	if err != nil {
-		return
+// Config maps the configuraiton in minima.yaml
+type Config struct {
+	Storage struct {
+		Type string
+		// file-specific
+		Path string
+		// s3-specific
+		AccessKeyID     string `yaml:"access_key_id"`
+		SecretAccessKey string `yaml:"secret_access_key"`
+		Region          string
+		Bucket          string
+	}
+	HTTP []struct {
+		URL   string
+		Archs []string
+	}
+}
+
+func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
+	config := Config{}
+	err = yaml.Unmarshal([]byte(configString), &config)
+
+	storageType := config.Storage.Type
+	if storageType != "file" && storageType != "s3" {
+		return nil, fmt.Errorf("Configuration parse error: unrecognised storage type")
 	}
 
-	repoCount, err := yaml.GetArraySize()
-	if err != nil {
-		return nil, fmt.Errorf("Configuration parse error: top-level structure is not an array")
-	}
-
-	for i := 0; i < repoCount; i++ {
-		// common options
-		repoNode := yaml.GetIndex(i)
-		url, err := repoNode.Get("url").String()
+	for _, httpRepo := range config.HTTP {
+		repoURL, err := url.Parse(httpRepo.URL)
 		if err != nil {
-			return nil, fmt.Errorf("Configuration parse error in entry %d: every entry must have an url key", i+1)
+			return nil, err
 		}
 
 		archs := map[string]bool{}
-		archsNode := repoNode.Get("archs")
-		if archsNode.IsArray() {
-			archStrings, err := archsNode.Array()
-			if err != nil {
-				return nil, fmt.Errorf("Configuration parse error for repo %s: archs should be an array", url)
-			}
-
-			for _, archString := range archStrings {
-				archs[archString.(string)] = true
-			}
+		for _, archString := range httpRepo.Archs {
+			archs[archString] = true
 		}
 
 		var storage get.Storage
-
-		// file-specific
-		pathNode := repoNode.Get("path")
-		if pathNode.IsFound() {
-			path, err := pathNode.String()
+		if storageType == "file" {
+			storage = get.NewFileStorage(filepath.Join(config.Storage.Path, filepath.FromSlash(repoURL.Path)))
+		}
+		if storageType == "s3" {
+			storage, err = get.NewS3Storage(config.Storage.AccessKeyID, config.Storage.AccessKeyID, config.Storage.Region, config.Storage.Bucket+repoURL.Path)
 			if err != nil {
-				return nil, fmt.Errorf("Configuration parse error for repo %s: path is invalid", url)
-			}
-			storage = get.NewFileStorage(path)
-		} else {
-			// s3-specific
-			bucketNode := repoNode.Get("bucket")
-			if bucketNode.IsFound() {
-				bucket, err := bucketNode.String()
-				if err != nil {
-					return nil, fmt.Errorf("Configuration parse error for repo %s: bucket is invalid", url)
-				}
-
-				region, err := repoNode.Get("region").String()
-				if err != nil {
-					return nil, fmt.Errorf("Configuration parse error for repo %s: region invalid or not specified", url)
-				}
-
-				accessKeyID, err := repoNode.Get("access_key_id").String()
-				if err != nil {
-					return nil, fmt.Errorf("Configuration parse error for repo %s: access_key_id invalid or not specified", url)
-				}
-
-				secretAccessKey, err := repoNode.Get("secret_access_key").String()
-				if err != nil {
-					return nil, fmt.Errorf("Configuration parse error for repo %s: secret_access_key invalid or not specified", url)
-				}
-
-				storage, err = get.NewS3Storage(accessKeyID, secretAccessKey, region, bucket)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				return nil, fmt.Errorf("Configuration parse error for repo %s: either path (filesystem storage) or bucket (AWS S3 storage) must be specified", url)
+				return nil, err
 			}
 		}
-
-		result = append(result, get.NewSyncer(url, archs, storage))
+		result = append(result, get.NewSyncer(httpRepo.URL, archs, storage))
 	}
+
 	return
 }
 
