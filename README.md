@@ -12,27 +12,29 @@ Currently, the only implemented functionality is the smart downloading of RPM re
 
 You can specify configuration in YAML either in a file (by default `minima.yaml`) or the `MINIMA_CONFIG` environment variable.
 
-A directory-based example `minima.yaml` is below:
+An example `minima.yaml` is below:
 ```yaml
 storage:
   type: file
   path: /srv/mirror
+  # uncomment to save to an AWS S3 bucket instead of the filesystem
+  # type: s3
+  # access_key_id: ACCESS_KEY_ID
+  # secret_access_key: SECRET_ACCESS_KEY
+  # region: us-east-1
+  # bucket: minima-bucket-key
 
 http:
   - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
-```
+    archs: [x86_64]
 
-An s3-based example `minima.yaml` is below:
-```yaml
-storage:
-  type: s3
-  access_key_id: ACCESS_KEY_ID
-  secret_access_key: SECRET_ACCESS_KEY
-  region: us-east-1
-  bucket: minima-bucket-key
-
-- url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
-  archs: [x86_64]
+# optional section to download repos from SCC
+# scc:
+#   username: UC7
+#   password: ***REMOVED***
+#   repo_names:
+#     - SLES12-SP2-LTSS-Updates
+#   archs: [x86_64]
 ```
 
 To sync repositories, use `minima sync`.

@@ -2,6 +2,7 @@ package get
 
 import (
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,7 +22,11 @@ func TestStoreRepo(t *testing.T) {
 		"x86_64": true,
 	}
 	storage := NewFileStorage(directory)
-	syncer := NewSyncer("http://localhost:8080/repo", archs, storage)
+	url, err := url.Parse("http://localhost:8080/repo")
+	if err != nil {
+		t.Error(err)
+	}
+	syncer := NewSyncer(*url, archs, storage)
 
 	// first sync
 	err = syncer.StoreRepo()

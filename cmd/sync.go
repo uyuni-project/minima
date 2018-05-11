@@ -19,24 +19,29 @@ var syncCmd = &cobra.Command{
 
   You can specify configuration in YAML either in a file or the MINIMA_CONFIG environment variable.
 
-  A directory-based example minima.yaml is below:
+  An example minima.yaml is below:
+
     storage:
       type: file
       path: /srv/mirror
+      # uncomment to save to an AWS S3 bucket instead of the filesystem
+      # type: s3
+      # access_key_id: ACCESS_KEY_ID
+      # secret_access_key: SECRET_ACCESS_KEY
+      # region: us-east-1
+      # bucket: minima-bucket-key
 
     http:
       - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
+        archs: [x86_64]
 
-  An s3-based example minima.yaml is below:
-    storage:
-      type: s3
-      access_key_id: ACCESS_KEY_ID
-      secret_access_key: SECRET_ACCESS_KEY
-      region: us-east-1
-      bucket: minima-bucket-key
-
-    - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
-      archs: [x86_64]
+    # optional section to download repos from SCC
+    # scc:
+    #   username: UC7
+    #   password: ***REMOVED***
+    #   repo_names:
+    #     - SLES12-SP2-LTSS-Updates
+    #   archs: [x86_64]
   `,
 	Run: func(cmd *cobra.Command, args []string) {
 		syncers, err := syncersFromConfig(cfgString)
@@ -44,7 +49,7 @@ var syncCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 		for _, syncer := range syncers {
-			log.Printf("Processing repo: %s", syncer.Url)
+			log.Printf("Processing repo: %s", syncer.URL.String())
 			err := syncer.StoreRepo()
 			if err != nil {
 				log.Println(err)
@@ -67,10 +72,19 @@ type Config struct {
 		Region          string
 		Bucket          string
 	}
-	HTTP []struct {
-		URL   string
-		Archs []string
+	SCC struct {
+		Username  string
+		Password  string
+		RepoNames []string `yaml:"repo_names"`
+		Archs     []string
 	}
+	HTTP []HTTPRepoConfig
+}
+
+// HTTPRepoConfig defines the configuration of an HTTP repo
+type HTTPRepoConfig struct {
+	URL   string
+	Archs []string
 }
 
 func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
@@ -80,6 +94,17 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 	storageType := config.Storage.Type
 	if storageType != "file" && storageType != "s3" {
 		return nil, fmt.Errorf("Configuration parse error: unrecognised storage type")
+	}
+
+	if config.SCC.Username != "" {
+		httpURLs, err := get.SCCURLs("https://scc.suse.com", config.SCC.Username, config.SCC.Password, config.SCC.RepoNames, config.SCC.Archs)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, httpURL := range httpURLs {
+			config.HTTP = append(config.HTTP, HTTPRepoConfig{httpURL, config.SCC.Archs})
+		}
 	}
 
 	for _, httpRepo := range config.HTTP {
@@ -103,7 +128,8 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 				return nil, err
 			}
 		}
-		result = append(result, get.NewSyncer(httpRepo.URL, archs, storage))
+
+		result = append(result, get.NewSyncer(*repoURL, archs, storage))
 	}
 
 	return

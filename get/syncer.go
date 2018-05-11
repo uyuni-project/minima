@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"path"
 
 	"github.com/moio/minima/util"
@@ -64,13 +65,13 @@ const repomdPath = "repodata/repomd.xml"
 // Syncer syncs repos from an HTTP source to a Storage
 type Syncer struct {
 	// URL of the repo this syncer syncs
-	Url     string
+	URL     url.URL
 	archs   map[string]bool
 	storage Storage
 }
 
 // NewSyncer creates a new Syncer
-func NewSyncer(url string, archs map[string]bool, storage Storage) *Syncer {
+func NewSyncer(url url.URL, archs map[string]bool, storage Storage) *Syncer {
 	return &Syncer{url, archs, storage}
 }
 
@@ -145,14 +146,16 @@ func (r *Syncer) downloadStore(path string, description string) error {
 }
 
 // downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
-func (r *Syncer) downloadStoreApply(path string, checksum string, description string, hash crypto.Hash, f util.ReaderConsumer) error {
+func (r *Syncer) downloadStoreApply(relativePath string, checksum string, description string, hash crypto.Hash, f util.ReaderConsumer) error {
 	log.Printf("Downloading %v...", description)
-	body, err := ReadURL(r.Url + "/" + path)
+	url := r.URL
+	url.Path = path.Join(r.URL.Path, relativePath)
+	body, err := ReadURL(url.String())
 	if err != nil {
 		return err
 	}
 
-	return util.Compose(r.storage.StoringMapper(path, checksum, hash), f)(body)
+	return util.Compose(r.storage.StoringMapper(relativePath, checksum, hash), f)(body)
 }
 
 // processMetadata stores the repo metadata and returns a list of package file
