@@ -49,7 +49,6 @@ func SCCURLs(baseURL string, username string, password string, nameFilters []str
 			break
 		}
 	}
-	fmt.Println(urls)
 
 	return
 }

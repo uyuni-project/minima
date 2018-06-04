@@ -171,16 +171,19 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 
 		data := repomd.Data
 		for i := 0; i < len(data); i++ {
+			log.Printf(data[i].Location.Href)
 			metadataLocation := data[i].Location.Href
 			metadataChecksum := data[i].Checksum
 			decision := r.decide(metadataLocation, metadataChecksum, checksumMap)
 			switch decision {
 			case Download:
+				log.Printf("...downloading")
 				err = r.downloadStoreApply(metadataLocation, metadataChecksum.Checksum, path.Base(metadataLocation), hashMap[metadataChecksum.Type], util.Nop)
 				if err != nil {
 					return
 				}
 			case Recycle:
+				log.Printf("...recycling")
 				r.storage.Recycle(metadataLocation)
 			}
 
