@@ -1,16 +1,19 @@
 package get
 
 import (
+	"bytes"
 	"compress/gzip"
 	"crypto"
 	"encoding/xml"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"path"
 
 	"github.com/moio/minima/util"
+	"golang.org/x/crypto/openpgp"
 )
 
 // common
@@ -97,6 +100,12 @@ func (r *Syncer) StoreRepo() (err error) {
 		if checksumError {
 			log.Printf(err.Error())
 			log.Printf("Checksum did not match, presumably the repo was published while syncing, retrying...\n")
+		}
+
+		_, signatureError := err.(*SignatureError)
+		if signatureError {
+			log.Printf(err.Error())
+			log.Printf("Signature not valid, presumably the repo was published while syncing, retrying...\n")
 		} else {
 			return err
 		}
@@ -162,7 +171,17 @@ func (r *Syncer) downloadStoreApply(relativePath string, checksum string, descri
 // paths to download
 func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
 	err = r.downloadStoreApply(repomdPath, "", path.Base(repomdPath), 0, func(reader io.ReadCloser) (err error) {
-		decoder := xml.NewDecoder(reader)
+		b, err := ioutil.ReadAll(reader)
+		if err != nil {
+			return
+		}
+
+		err = r.checkRepomdSignature(bytes.NewReader(b))
+		if err != nil {
+			return
+		}
+
+		decoder := xml.NewDecoder(bytes.NewReader(b))
 		var repomd XMLRepomd
 		err = decoder.Decode(&repomd)
 		if err != nil {
@@ -197,30 +216,51 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 		return
 	}
 
-	ascPath := repomdPath + ".asc"
-	err = r.downloadStore(ascPath, path.Base(ascPath))
-	if err != nil {
-		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
-		if unexpectedStatusCode && uerr.StatusCode == 404 {
-			log.Printf("Got 404, ignoring...")
-		} else {
-			return
-		}
-	}
+	return
+}
 
+func (r *Syncer) checkRepomdSignature(repomdReader io.Reader) (err error) {
+	ascPath := repomdPath + ".asc"
 	keyPath := repomdPath + ".key"
-	err = r.downloadStore(keyPath, path.Base(keyPath))
+
+	err = r.downloadStoreApply(ascPath, "", path.Base(ascPath), 0, func(signatureReader io.ReadCloser) (err error) {
+		err = r.downloadStoreApply(keyPath, "", path.Base(keyPath), 0, func(keyReader io.ReadCloser) (err error) {
+			keyring, err := openpgp.ReadArmoredKeyRing(keyReader)
+			if err != nil {
+				return &SignatureError{"repomd.key file does not contain a valid signature"}
+			}
+			_, err = openpgp.CheckArmoredDetachedSignature(keyring, repomdReader, signatureReader)
+			if err != nil {
+				return &SignatureError{"repomd.asc signature check failed, signature is not valid"}
+			}
+			return
+		})
+		if err != nil {
+			uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
+			if unexpectedStatusCode && uerr.StatusCode == 404 {
+				log.Printf("Got 404, ignoring...")
+				err = nil
+			}
+		}
+		return
+	})
 	if err != nil {
 		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
 		if unexpectedStatusCode && uerr.StatusCode == 404 {
 			log.Printf("Got 404, ignoring...")
 			err = nil
-		} else {
-			return
 		}
 	}
-
 	return
+}
+
+// SignatureError is returned if a signature was found but it's invalid
+type SignatureError struct {
+	reason string
+}
+
+func (e *SignatureError) Error() string {
+	return fmt.Sprintf("Signature error: %s", e.reason)
 }
 
 func (r *Syncer) readMetaData(reader io.Reader) (primary XMLMetaData, err error) {
@@ -243,7 +283,6 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 		if err == ErrFileNotFound {
 			log.Println("First-time sync started")
 		} else {
-			log.Println(err.Error())
 			log.Println("Error while reading previously-downloaded metadata. Starting sync from scratch")
 		}
 		return
@@ -254,7 +293,6 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 	var repomd XMLRepomd
 	err = decoder.Decode(&repomd)
 	if err != nil {
-		log.Println(err.Error())
 		log.Println("Error while parsing previously-downloaded metadata. Starting sync from scratch")
 		return
 	}
