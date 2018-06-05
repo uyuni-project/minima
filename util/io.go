@@ -23,7 +23,11 @@ func Compose(mapper ReaderMapper, f ReaderConsumer) ReaderConsumer {
 			return
 		}
 		defer func() {
-			err = mappedReader.Close()
+			if err != nil {
+				mappedReader.Close()
+			} else {
+				err = mappedReader.Close()
+			}
 		}()
 
 		return f(mappedReader)
