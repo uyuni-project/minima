@@ -67,3 +67,57 @@ func TestStoreRepo(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestStoreDebRepo(t *testing.T) {
+	directory := filepath.Join(os.TempDir(), "syncer_test")
+	err := os.RemoveAll(directory)
+	if err != nil {
+		t.Error(err)
+	}
+
+	archs := map[string]bool{
+		"amd64": true,
+	}
+	storage := NewFileStorage(directory)
+	url, err := url.Parse("http://localhost:8080/deb_repo")
+	if err != nil {
+		t.Error(err)
+	}
+	syncer := NewSyncer(*url, archs, storage)
+
+	// first sync
+	err = syncer.StoreRepo()
+	if err != nil {
+		t.Error(err)
+	}
+
+	expectedFiles := []string{
+		"Packages.gz",
+		"Release",
+		filepath.Join("amd64", "milkyway-dummy_2.0-1.1_amd64.deb"),
+		filepath.Join("amd64", "orion-dummy_1.1-1.1_amd64.deb"),
+		filepath.Join("amd64", "hoag-dummy_1.1-2.1_amd64.deb"),
+		filepath.Join("amd64", "perseus-dummy_1.1-1.1_amd64.deb"),
+		filepath.Join("amd64", "orion-dummy-sle12_1.1-4.1_amd64.deb"),
+	}
+
+	for _, file := range expectedFiles {
+		originalInfo, serr := os.Stat(filepath.Join("testdata", "deb_repo", file))
+		if err != nil {
+			t.Fatal(serr)
+		}
+		syncedInfo, serr := os.Stat(filepath.Join(directory, file))
+		if serr != nil {
+			t.Fatal(serr)
+		}
+		if originalInfo.Size() != syncedInfo.Size() {
+			t.Error("original and synced versions of", file, "differ:", originalInfo.Size(), "vs", syncedInfo.Size())
+		}
+	}
+
+	// second sync
+	err = syncer.StoreRepo()
+	if err != nil {
+		t.Error(err)
+	}
+}

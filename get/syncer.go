@@ -5,12 +5,14 @@ import (
 	"compress/gzip"
 	"crypto"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/moio/minima/util"
 	"golang.org/x/crypto/openpgp"
@@ -64,6 +66,39 @@ var hashMap = map[string]crypto.Hash{
 }
 
 const repomdPath = "repodata/repomd.xml"
+const releasePath = "Release"
+
+type RepoType struct {
+	MetadataPath string
+	PackagesType string
+	DecodeMetadata func(io.Reader) (XMLRepomd, error)
+	DecodePackages func(io.Reader) (XMLMetaData, error)
+	MetadataSignatureExt string
+    Noarch string
+}
+
+var repoTypes = map[string]RepoType {
+	"rpm": RepoType {
+		MetadataPath: "repodata/repomd.xml",
+		PackagesType: "primary",
+		DecodeMetadata: func (reader io.Reader) (repomd XMLRepomd, err error) {
+			decoder := xml.NewDecoder(reader)
+			err = decoder.Decode(&repomd)
+			return
+		},
+		DecodePackages: readMetaData,
+		MetadataSignatureExt: ".asc",
+        Noarch: "noarch",
+	},
+	"deb": RepoType {
+		MetadataPath: "Release",
+		PackagesType: "Packages",
+		DecodeMetadata: decodeRelease,
+		DecodePackages: decodePackages,
+		MetadataSignatureExt: ".gpg",
+        Noarch: "all",
+	},
+}
 
 // Syncer syncs repos from an HTTP source to a Storage
 type Syncer struct {
@@ -167,23 +202,22 @@ func (r *Syncer) downloadStoreApply(relativePath string, checksum string, descri
 	return util.Compose(r.storage.StoringMapper(relativePath, checksum, hash), f)(body)
 }
 
+
 // processMetadata stores the repo metadata and returns a list of package file
 // paths to download
 func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
-	err = r.downloadStoreApply(repomdPath, "", path.Base(repomdPath), 0, func(reader io.ReadCloser) (err error) {
+	doProcessMetadata := func (reader io.ReadCloser, repoType RepoType) (err error) {
 		b, err := ioutil.ReadAll(reader)
 		if err != nil {
 			return
 		}
 
-		err = r.checkRepomdSignature(bytes.NewReader(b))
+		err = r.checkRepomdSignature(bytes.NewReader(b), repoType)
 		if err != nil {
 			return
 		}
 
-		decoder := xml.NewDecoder(bytes.NewReader(b))
-		var repomd XMLRepomd
-		err = decoder.Decode(&repomd)
+		repomd, err := repoType.DecodeMetadata(bytes.NewReader(b))
 		if err != nil {
 			return
 		}
@@ -206,32 +240,42 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 				r.storage.Recycle(metadataLocation)
 			}
 
-			if data[i].Type == "primary" {
-				packagesToDownload, packagesToRecycle, err = r.processPrimary(metadataLocation, checksumMap)
+			if data[i].Type == repoType.PackagesType {
+				packagesToDownload, packagesToRecycle, err = r.processPrimary(metadataLocation, checksumMap, repoType)
 			}
 		}
 		return
+	}
+
+	err = r.downloadStoreApply(repomdPath, "", path.Base(repomdPath), 0, func(reader io.ReadCloser) (err error) {
+		err = doProcessMetadata(reader, repoTypes["rpm"])
+		return
 	})
 	if err != nil {
+		// attempt to download Debian's Release file
+		err = r.downloadStoreApply(releasePath, "", path.Base(releasePath), 0, func(reader io.ReadCloser) (err error) {
+			err = doProcessMetadata(reader, repoTypes["deb"])
+			return
+		})
 		return
 	}
 
 	return
 }
 
-func (r *Syncer) checkRepomdSignature(repomdReader io.Reader) (err error) {
-	ascPath := repomdPath + ".asc"
-	keyPath := repomdPath + ".key"
+func (r *Syncer) checkRepomdSignature(repomdReader io.Reader, repoType RepoType) (err error) {
+	ascPath := repoType.MetadataPath + repoType.MetadataSignatureExt
+	keyPath := repoType.MetadataPath + ".key"
 
 	err = r.downloadStoreApply(ascPath, "", path.Base(ascPath), 0, func(signatureReader io.ReadCloser) (err error) {
 		err = r.downloadStoreApply(keyPath, "", path.Base(keyPath), 0, func(keyReader io.ReadCloser) (err error) {
 			keyring, err := openpgp.ReadArmoredKeyRing(keyReader)
 			if err != nil {
-				return &SignatureError{"repomd.key file does not contain a valid signature"}
+				return &SignatureError{keyPath + " file does not contain a valid signature"}
 			}
 			_, err = openpgp.CheckArmoredDetachedSignature(keyring, repomdReader, signatureReader)
 			if err != nil {
-				return &SignatureError{"repomd.asc signature check failed, signature is not valid"}
+				return &SignatureError{ascPath + " signature check failed, signature is not valid"}
 			}
 			return
 		})
@@ -263,7 +307,7 @@ func (e *SignatureError) Error() string {
 	return fmt.Sprintf("Signature error: %s", e.reason)
 }
 
-func (r *Syncer) readMetaData(reader io.Reader) (primary XMLMetaData, err error) {
+func readMetaData(reader io.Reader) (primary XMLMetaData, err error) {
 	gzReader, err := gzip.NewReader(reader)
 	if err != nil {
 		return
@@ -279,9 +323,15 @@ func (r *Syncer) readMetaData(reader io.Reader) (primary XMLMetaData, err error)
 func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 	checksumMap = make(map[string]XMLChecksum)
 	repomdReader, err := r.storage.NewReader(repomdPath, Permanent)
+	repoType := repoTypes["rpm"]
 	if err != nil {
 		if err == ErrFileNotFound {
-			log.Println("First-time sync started")
+			repomdReader, err = r.storage.NewReader(releasePath, Permanent)
+			if err != nil {
+				log.Println("First-time sync started")
+			} else {
+				repoType = repoTypes["deb"]
+			}
 		} else {
 			log.Println("Error while reading previously-downloaded metadata. Starting sync from scratch")
 		}
@@ -289,9 +339,7 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 	}
 	defer repomdReader.Close()
 
-	decoder := xml.NewDecoder(repomdReader)
-	var repomd XMLRepomd
-	err = decoder.Decode(&repomd)
+	repomd, err := repoType.DecodeMetadata(repomdReader)
 	if err != nil {
 		log.Println("Error while parsing previously-downloaded metadata. Starting sync from scratch")
 		return
@@ -302,12 +350,12 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 		dataHref := data[i].Location.Href
 		dataChecksum := data[i].Checksum
 		checksumMap[dataHref] = dataChecksum
-		if data[i].Type == "primary" {
+		if data[i].Type == repoType.PackagesType {
 			primaryReader, err := r.storage.NewReader(dataHref, Permanent)
 			if err != nil {
 				return
 			}
-			primary, err := r.readMetaData(primaryReader)
+			primary, err := repoType.DecodePackages(primaryReader)
 			if err != nil {
 				return
 			}
@@ -321,19 +369,19 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
-func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
+func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum, repoType RepoType) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
 	reader, err := r.storage.NewReader(path, Temporary)
 	if err != nil {
 		return
 	}
-	primary, err := r.readMetaData(reader)
+	primary, err := repoType.DecodePackages(reader)
 	if err != nil {
 		return
 	}
 
 	allArchs := len(r.archs) == 0
 	for _, pack := range primary.Packages {
-		if allArchs || pack.Arch == "noarch" || r.archs[pack.Arch] {
+		if allArchs || pack.Arch == repoType.Noarch || r.archs[pack.Arch] {
 			decision := r.decide(pack.Location.Href, pack.Checksum, checksumMap)
 			switch decision {
 			case Download:
@@ -373,4 +421,57 @@ func (r *Syncer) decide(location string, checksum XMLChecksum, checksumMap map[s
 		return Skip
 	}
 	return Recycle
+}
+
+// Functions to handle Debian formatted repositories
+
+func decodeRelease(reader io.Reader) (repomd XMLRepomd, err error) {
+	entries, err := util.ProcessPropertiesFile(reader)
+	if err != nil {
+		return
+	}
+	if len(entries) == 0 {
+		err = errors.New("No content in Release file")
+		return
+	}
+	if len(entries[0]["SHA256"]) == 0 {
+		err = errors.New("Missing SHA256 entry in Release file")
+		return
+	}
+	fileEntries := strings.Split(entries[0]["SHA256"], "\n")
+
+	data := make([]XMLData, 0)
+	for _, fileEntry := range fileEntries {
+		infos := strings.Split(fileEntry, " ")
+		if len(infos) != 3 {
+			err = fmt.Errorf("badly formatted file entry: '%s'", fileEntry)
+			return
+		}
+		fileData := XMLData{
+			Type: infos[2],
+			Location: XMLLocation{ Href: infos[2] },
+			Checksum: XMLChecksum{ Type: "sha256", Checksum: infos[0] },
+		}
+		data = append(data, fileData)
+	}
+	repomd = XMLRepomd{Data: data}
+	return
+}
+
+func decodePackages(reader io.Reader) (metadata XMLMetaData, err error) {
+	packagesEntries, err := util.ProcessPropertiesFile(reader)
+	if err != nil {
+		return
+	}
+
+	packages := make([]XMLPackage, 0)
+	for _, packageEntry := range packagesEntries {
+		packages = append(packages, XMLPackage{
+			Arch: packageEntry["Architecture"],
+			Location: XMLLocation{ Href: packageEntry["Filename"] },
+			Checksum: XMLChecksum{ Type: "sha256", Checksum: packageEntry["SHA256"] },
+		})
+	}
+	metadata = XMLMetaData{ Packages: packages }
+	return
 }
