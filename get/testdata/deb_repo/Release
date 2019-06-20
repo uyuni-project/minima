@@ -1,0 +1,16 @@
+Archive: update
+Codename: update
+Origin: obs://build.suse.de/Devel:Galaxy:TestsuiteRepo/SLE_12_SP1
+Label: Devel:Galaxy:TestsuiteRepo:x86_64
+Architectures: amd64
+Date: Thu Apr 18 12:52:48 2019
+Description: update channel (update)
+MD5Sum:
+ c4a92f759d7f3d944f4a71b22b488fc5 3631 Packages
+ 4ec5a01c7f645246a27e3ce1b45695fd 1138 Packages.gz
+SHA1:
+ 3f42d1d30b752e4c80ecbd70782c910d40416542 3631 Packages
+ 0eabffb7605228c7b6a7d9c6d7a972c6442eaea1 1138 Packages.gz
+SHA256:
+ 975c20b72da841c49c79d00329542ed55a88849ecdc3df5645644411abb6e7ae 3631 Packages
+ 09ed8c64913e9c4e2ad97889f50e468cb48d2f2d5cfdfd58cb37369f2904cbbe 1138 Packages.gz

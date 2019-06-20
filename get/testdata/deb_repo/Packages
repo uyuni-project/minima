@@ -1,0 +1,119 @@
+Package: hoag-dummy
+Version: 1.1-3.1
+Architecture: amd64
+Maintainer: root <root@stibbons>
+Installed-Size: 17
+Filename: amd64/hoag-dummy_1.1-2.1_amd64.deb
+Size: 8720
+MD5sum: 5abf3fb086daffac7e033ce584a807ba
+SHA1: e450c08b64b2680fcaee0e177f86f9e99b258c0d
+SHA256: 324a9fcefe9464a93cb3c9c9d70d90520b7a46ce6d6b2dfc8b4e4342569d0385
+Section: alien
+Priority: extra
+Description: Hoag dummy package
+ This is the hoag dummy package used for testing SUSE Manager
+ .
+ (Converted from a rpm package by alien version 8.88.)
+
+Package: milkyway-dummy
+Version: 2.0-2.1
+Architecture: amd64
+Maintainer: root <root@stibbons>
+Installed-Size: 20
+Filename: amd64/milkyway-dummy_2.0-1.1_amd64.deb
+Size: 8868
+MD5sum: a74d7355a2b7f936ec68b93cc8f8f9d8
+SHA1: af2d8fdfe5b271dfbd664d62cea9080d66ddcaf9
+SHA256: a280c38082ffa11e9413bb205a62862bb6618303f4269d24223ef667821228fd
+Section: alien
+Priority: extra
+Description: Milkyway dummy package
+ This is the andromeda dummy package used for testing SUSE Manager
+ .
+ (Converted from a rpm package by alien version 8.88.)
+
+Package: orion-dummy
+Version: 1.1-2.1
+Architecture: amd64
+Maintainer: root <root@stibbons>
+Installed-Size: 17
+Filename: amd64/orion-dummy_1.1-1.1_amd64.deb
+Size: 8736
+MD5sum: 3bca06dde75037683a91d8c4419af6da
+SHA1: 0f4c9556be8b9d758944f36bb2ed8201b399eb3f
+SHA256: 51b483728f08b78ddfa45e1b0c6eb51864946363a33c6833eae1721cad2c5ae3
+Section: alien
+Priority: extra
+Description: Orion dummy package
+ This is the orion dummy package used for testing SUSE Manager
+ .
+ (Converted from a rpm package by alien version 8.88.)
+
+Package: orion-dummy-sle12
+Version: 1.1-5.1
+Architecture: amd64
+Maintainer: root <root@stibbons>
+Installed-Size: 17
+Filename: amd64/orion-dummy-sle12_1.1-4.1_amd64.deb
+Size: 8752
+MD5sum: 6c5b8fc298b8b63422861b64e152e7ed
+SHA1: a9092c99c9df382472ac28f4286fe12fb0cb744f
+SHA256: eac6a0790319bf87246626c48aebb6dc2a7e5b8438aef8ac249885a8c380bd80
+Section: alien
+Priority: extra
+Description: Orion dummy package
+ This is the orion dummy package used for testing SUSE Manager
+ .
+ (Converted from a rpm package by alien version 8.88.)
+
+Package: perseus-dummy
+Version: 1.1-2.1
+Architecture: amd64
+Maintainer: root <root@stibbons>
+Installed-Size: 17
+Filename: amd64/perseus-dummy_1.1-1.1_amd64.deb
+Size: 8740
+MD5sum: 1dda70ed9a84af9658aa77a99c8f7d5a
+SHA1: 17691c0e22e862ff9d46db10ee71391bacdb6bec
+SHA256: aef537f7e5fbe368ac92df2fc87dc8e8646b35deced4e2c43069a5103836dbe7
+Section: alien
+Priority: extra
+Description: perseus dummy package
+ This is the perseus dummy package used for testing SUSE Manager
+ .
+ (Converted from a rpm package by alien version 8.88.)
+
+Package: andromeda-dummy
+Version: 2.0-2.1
+Architecture: all
+Maintainer: root <root@stibbons>
+Installed-Size: 17
+Filename: all/andromeda-dummy_2.0-2.1_all.deb
+Size: 8720
+MD5sum: b5fbe4f84b5f204113377f0b9a8cea13
+SHA1: 8eee948c4b8d3a5cc9507c2b9f72ccb02b668af6
+SHA256: 940152334fabe99e620e9b0b99c2f5dc8afcce410ab5bcd1494b8aeada46d6f6
+Section: alien
+Priority: extra
+Description: Andromeda dummy package
+ This is the andromeda dummy package used for testing SUSE Manager
+ .
+ (Converted from a rpm package by alien version 8.88.)
+
+Package: virgo-dummy
+Version: 2.0-2.1
+Architecture: all
+Maintainer: root <root@stibbons>
+Installed-Size: 17
+Filename: all/virgo-dummy_2.0-2.1_all.deb
+Size: 8732
+MD5sum: afc2fa4e26beabec8bbcdffe68aa3084
+SHA1: 52a820a1c3c6ed25a73a030dca6a07037aa81b57
+SHA256: 2cc82ee30e80a69d662eb91946db29c350866e4309482a7d7d4a780c673a4b79
+Section: alien
+Priority: extra
+Description: Virgo dummy package
+ This is the Virgo dummy package used for testing SUSE Manager
+ .
+ (Converted from a rpm package by alien version 8.88.)
+
