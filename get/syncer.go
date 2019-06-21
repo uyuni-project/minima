@@ -124,8 +124,9 @@ func (r *Syncer) StoreRepo() (err error) {
 
 		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
 		if unexpectedStatusCode {
-			if uerr.StatusCode == 404 {
-				log.Printf("Got 404, presumably temporarily, retrying...\n")
+			sc := uerr.StatusCode
+			if sc == 401 || sc == 403 || sc == 404 || sc == 410 || sc == 502 || sc == 503 || sc == 504 {
+				log.Printf("Got %v, presumably temporarily, retrying...\n", sc)
 			} else {
 				return err
 			}
