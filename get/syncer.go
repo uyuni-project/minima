@@ -136,6 +136,7 @@ func (r *Syncer) StoreRepo() (err error) {
 		if checksumError {
 			log.Printf(err.Error())
 			log.Printf("Checksum did not match, presumably the repo was published while syncing, retrying...\n")
+			continue
 		}
 
 		_, signatureError := err.(*SignatureError)
