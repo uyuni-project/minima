@@ -14,7 +14,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/moio/minima/util"
+	"github.com/uyuni-project/minima/util"
 	"golang.org/x/crypto/openpgp"
 )
 

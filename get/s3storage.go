@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/moio/minima/util"
+	"github.com/uyuni-project/minima/util"
 )
 
 // S3Storage allows to store data in an Amazon S3 bucket
