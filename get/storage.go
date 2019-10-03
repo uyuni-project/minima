@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/moio/minima/util"
+	"github.com/uyuni-project/minima/util"
 )
 
 // Location represents a directory in a Storage object

@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"path/filepath"
 
-	"github.com/moio/minima/get"
+	"github.com/uyuni-project/minima/get"
 	"github.com/spf13/cobra"
 	yaml "gopkg.in/yaml.v2"
 )

@@ -7,7 +7,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/moio/minima/util"
+	"github.com/uyuni-project/minima/util"
 )
 
 // FileStorage allows to store data in a local directory
