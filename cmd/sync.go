@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/url"
 	"path/filepath"
+	"os"
 
 	"github.com/uyuni-project/minima/get"
 	"github.com/spf13/cobra"
@@ -44,18 +45,24 @@ var syncCmd = &cobra.Command{
     #   archs: [x86_64]
   `,
 	Run: func(cmd *cobra.Command, args []string) {
+		var errorflag bool = false
 		syncers, err := syncersFromConfig(cfgString)
 		if err != nil {
 			log.Fatal(err)
+			errorflag = true
 		}
 		for _, syncer := range syncers {
 			log.Printf("Processing repo: %s", syncer.URL.String())
 			err := syncer.StoreRepo()
 			if err != nil {
 				log.Println(err)
+				errorflag = true
 			} else {
 				log.Println("...done.")
 			}
+		}
+		if errorflag {
+			os.Exit(1)
 		}
 	},
 }
