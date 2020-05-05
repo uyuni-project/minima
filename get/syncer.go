@@ -409,8 +409,17 @@ const (
 )
 
 func (r *Syncer) decide(location string, checksum XMLChecksum, checksumMap map[string]XMLChecksum) Decision {
-	previousChecksum, foundInPermanentLocation := checksumMap[location]
-	if !foundInPermanentLocation || previousChecksum.Type != checksum.Type || previousChecksum.Checksum != checksum.Checksum {
+	previousChecksum, foundInChecksumMap := checksumMap[location]
+
+	if foundInChecksumMap {
+		reader, err := r.storage.NewReader(location, Permanent)
+		if err != nil {
+			return Download
+		}
+		defer reader.Close()
+	}
+
+	if !foundInChecksumMap || previousChecksum.Type != checksum.Type || previousChecksum.Checksum != checksum.Checksum {
 		reader, err := r.storage.NewReader(location, Temporary)
 		if err != nil {
 			return Download
