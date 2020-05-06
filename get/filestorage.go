@@ -72,7 +72,12 @@ func (s *FileStorage) Recycle(filename string) (err error) {
 		return
 	}
 
-	return os.Link(path.Join(s.directory, filename), newPath)
+	err = os.Link(path.Join(s.directory, filename), newPath)
+	if err != nil && os.IsExist(err) {
+		// ignore, we are fine already
+		return nil
+	}
+	return
 }
 
 // Commit moves any temporary file accumulated so far to the permanent location
