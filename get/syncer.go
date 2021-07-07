@@ -383,7 +383,7 @@ func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum,
 
 	allArchs := len(r.archs) == 0
 	for _, pack := range primary.Packages {
-		if allArchs || pack.Arch == repoType.Noarch || r.archs[pack.Arch] {
+		if allArchs || pack.Arch == repoType.Noarch || r.archs[pack.Arch] || (r.archs["i586"] && pack.Arch == "i686") {
 			decision := r.decide(pack.Location.Href, pack.Checksum, checksumMap)
 			switch decision {
 			case Download:
