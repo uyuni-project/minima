@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"path/filepath"
 	"os"
+	"path/filepath"
 
-	"github.com/uyuni-project/minima/get"
 	"github.com/spf13/cobra"
+	"github.com/uyuni-project/minima/get"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -78,12 +78,19 @@ type Config struct {
 		SecretAccessKey string `yaml:"secret_access_key"`
 		Region          string
 		Bucket          string
+		JsonPath		string `yaml:"jsonpath"`
+		ProjectID		string `yaml:"projectid"`
 	}
+
 	SCC struct {
 		Username  string
 		Password  string
 		RepoNames []string `yaml:"repo_names"`
 		Archs     []string
+	}
+	OBS struct {
+		Username	string
+		Password	string
 	}
 	HTTP []HTTPRepoConfig
 }
@@ -99,8 +106,8 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 	err = yaml.Unmarshal([]byte(configString), &config)
 
 	storageType := config.Storage.Type
-	if storageType != "file" && storageType != "s3" {
-		return nil, fmt.Errorf("Configuration parse error: unrecognised storage type")
+	if storageType != "file" && storageType != "s3" && storageType != "gcp"{
+		return nil, fmt.Errorf("configuration parse error: unrecognised storage type")
 	}
 
 	if config.SCC.Username != "" {
@@ -126,16 +133,20 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 		}
 
 		var storage get.Storage
-		if storageType == "file" {
+		switch storageType {
+		case "file":
 			storage = get.NewFileStorage(filepath.Join(config.Storage.Path, filepath.FromSlash(repoURL.Path)))
-		}
-		if storageType == "s3" {
+		case "s3":
 			storage, err = get.NewS3Storage(config.Storage.AccessKeyID, config.Storage.AccessKeyID, config.Storage.Region, config.Storage.Bucket+repoURL.Path)
 			if err != nil {
 				return nil, err
 			}
+		case "gcp":
+			storage, err = get.NewGCStorage(config.Storage.JsonPath, config.Storage.Region, config.Storage.ProjectID, config.Storage.Bucket)
+			if err != nil {
+				return nil, err
+			}
 		}
-
 		result = append(result, get.NewSyncer(*repoURL, archs, storage))
 	}
 

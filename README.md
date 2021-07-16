@@ -23,6 +23,7 @@ storage:
   # secret_access_key: SECRET_ACCESS_KEY
   # region: us-east-1
   # bucket: minima-bucket-key
+  #
 
 http:
   - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
@@ -35,9 +36,21 @@ http:
 #   repo_names:
 #     - SLES12-SP2-LTSS-Updates
 #   archs: [x86_64]
+
+# OBS credentials:
+# obs:
+#    username: ""
+#    password: ""
 ```
 
+
+
 To sync repositories, use `minima sync`.
+
+To search for new MU repositories, use `minima updates -s`.
+To search and sync automatically all the new MU repositories:
+use `minima updates`.
+
 
 ## How to contribute
 
