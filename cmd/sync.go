@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/uyuni-project/minima/get"
@@ -13,7 +14,8 @@ import (
 )
 
 // syncCmd represents the sync command
-var syncCmd = &cobra.Command{
+var (
+	syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Synchronizes repos from remote locations",
 	Long: `Synchronizes content in repos to a directory or an S3 bucket.
@@ -66,6 +68,10 @@ var syncCmd = &cobra.Command{
 		}
 	},
 }
+thisRepo string
+archs string
+syncLegacyPackages bool
+)
 
 // Config maps the configuraiton in minima.yaml
 type Config struct {
@@ -110,7 +116,18 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 		return nil, fmt.Errorf("configuration parse error: unrecognised storage type")
 	}
 
+	//---passing the flag value to a global variable in get package, to trigger syncing of i586 rpms inside x86_64
+	get.Legacy = syncLegacyPackages
+
 	if config.SCC.Username != "" {
+		if thisRepo != "" {
+			if archs == "" {
+				archs = "x86_64"
+			}
+			config.SCC.RepoNames = []string{thisRepo}
+			config.SCC.Archs = strings.Split(archs, ",")
+		}
+
 		httpURLs, err := get.SCCURLs("https://scc.suse.com", config.SCC.Username, config.SCC.Password, config.SCC.RepoNames, config.SCC.Archs)
 		if err != nil {
 			return nil, err
@@ -155,4 +172,7 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 
 func init() {
 	RootCmd.AddCommand(syncCmd)
+	RootCmd.PersistentFlags().StringVarP(&thisRepo, "repository", "r", "", "flag that can specifies a single repo (example: SLES11-SP4-Updates)")
+	RootCmd.PersistentFlags().StringVarP(&archs, "arch", "a", "", "flag that specifies covered archs in the given repo")
+	RootCmd.PersistentFlags().BoolVarP(&syncLegacyPackages, "legacypackages", "l", false, "flag that triggers mirroring of i586 pkgs in x86_64 repos")
 }
