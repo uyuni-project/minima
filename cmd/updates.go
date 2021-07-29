@@ -54,17 +54,10 @@ to quickly create a Cobra application.`,
 
 func init() {
 	RootCmd.AddCommand(update)
-	RootCmd.PersistentFlags().BoolVarP(&spitYamls, "yaml", "y", false, "flag that would trigger generating minima_mu<#INCIDENT>.yaml configs")
+	RootCmd.PersistentFlags().BoolVarP(&spitYamls, "yaml", "y", false, "flag that would trigger generating minima_obs_<Date>.yaml configs")
 	RootCmd.PersistentFlags().BoolVarP(&justSearch, "search", "s", false, "flag that would trigger only looking for updates on OBS")
 	RootCmd.PersistentFlags().StringVarP(&thisMU, "maintupdate", "m", "", "flag that consumes the name of an MU, like 'SUSE:Maintenance:Incident:ReleaseRequest'")
 	RootCmd.PersistentFlags().BoolVarP(&cleanup, "cleanup", "k", false, "flag that triggers cleaning up the storage (from old MU channels)")
-	// Here you will define your flags and configuration settings.
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// mufnsCmd.PersistentFlags().String("foo", "", "A help for foo")
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// mufnsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 func muFindAndSync() {
@@ -76,6 +69,7 @@ func muFindAndSync() {
 	}
 	if cleanup {
 		// DO CLEANUP - TO BE IMPLEMENTED
+		log.Println("searching for outdated MU repos...")
 		updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, true)
 		if err != nil {
 			log.Fatalf("There is an error: %v", err)
@@ -84,6 +78,7 @@ func muFindAndSync() {
 		if err != nil {
 			log.Fatalf("There is an error: %v", err)
 		}
+		log.Println("...done!")
 	} else {
 		if thisMU == "" {
 			updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, justSearch)
@@ -233,19 +228,25 @@ func GetRepo(mu string) (httpFormattedRepos []HTTPRepoConfig, err error) {
 }
 
 func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updates, err error){
-	var update Updates
 	client := updates.NewClient(usr, passwd)
 	rrs, err := client.GetReleaseRequests("qam-manager", "new,review")
 	if err != nil {
 		return updlist, fmt.Errorf("error while getting response from obs: %v", err)
 	}
 	for _, value := range rrs {
+		var update Updates
 		update.ReleaseRequest = value.Id
-		if len(strings.Split(value.Actions[0].Target.Package, ".")) > 1 {
-			update.IncidentNumber = strings.Split(value.Actions[0].Target.Package, ".")[1]
+
+		for i:=0; i < len(value.Actions); i++ {
+			if len(strings.Split(value.Actions[i].Target.Package, ".")) > 1 {
+				update.IncidentNumber = strings.Split(value.Actions[i].Target.Package, ".")[1]
+				if update.IncidentNumber != "" {
+					break
+				}
+			}
 		}
 		for _, val := range value.Actions {
-			if !strings.Contains(val.Target.Package, "patchinfo") {
+			if !strings.Contains(val.Target.Package, "patchinfo") && !(strings.Contains(val.Target.Package, "SLE") || strings.Contains(val.Target.Package, "Module")) {
 				update.SRCRPMS = append(update.SRCRPMS, strings.Split(val.Target.Package, ".")[0])
 			}
 		}
@@ -256,7 +257,6 @@ func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updat
 			return updlist, fmt.Errorf("something went wrong in repo processing: %v", err)
 		}
 		updlist = append(updlist, update)
-
 	}
 	return updlist, err
 }
