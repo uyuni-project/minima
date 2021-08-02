@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"path/filepath"
 	"os"
+	"path/filepath"
+	"strings"
 
-	"github.com/uyuni-project/minima/get"
 	"github.com/spf13/cobra"
+	"github.com/uyuni-project/minima/get"
 	yaml "gopkg.in/yaml.v2"
 )
 
 // syncCmd represents the sync command
-var syncCmd = &cobra.Command{
+var (
+	syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Synchronizes repos from remote locations",
 	Long: `Synchronizes content in repos to a directory or an S3 bucket.
@@ -66,6 +68,10 @@ var syncCmd = &cobra.Command{
 		}
 	},
 }
+thisRepo string
+archs string
+syncLegacyPackages bool
+)
 
 // Config maps the configuraiton in minima.yaml
 type Config struct {
@@ -78,12 +84,19 @@ type Config struct {
 		SecretAccessKey string `yaml:"secret_access_key"`
 		Region          string
 		Bucket          string
+		JsonPath		string `yaml:"jsonpath"`
+		ProjectID		string `yaml:"projectid"`
 	}
+
 	SCC struct {
 		Username  string
 		Password  string
 		RepoNames []string `yaml:"repo_names"`
 		Archs     []string
+	}
+	OBS struct {
+		Username	string
+		Password	string
 	}
 	HTTP []HTTPRepoConfig
 }
@@ -99,11 +112,22 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 	err = yaml.Unmarshal([]byte(configString), &config)
 
 	storageType := config.Storage.Type
-	if storageType != "file" && storageType != "s3" {
-		return nil, fmt.Errorf("Configuration parse error: unrecognised storage type")
+	if storageType != "file" && storageType != "s3" && storageType != "gcp"{
+		return nil, fmt.Errorf("configuration parse error: unrecognised storage type")
 	}
 
+	//---passing the flag value to a global variable in get package, to trigger syncing of i586 rpms inside x86_64
+	get.Legacy = syncLegacyPackages
+
 	if config.SCC.Username != "" {
+		if thisRepo != "" {
+			if archs == "" {
+				archs = "x86_64"
+			}
+			config.SCC.RepoNames = []string{thisRepo}
+			config.SCC.Archs = strings.Split(archs, ",")
+		}
+
 		httpURLs, err := get.SCCURLs("https://scc.suse.com", config.SCC.Username, config.SCC.Password, config.SCC.RepoNames, config.SCC.Archs)
 		if err != nil {
 			return nil, err
@@ -126,16 +150,20 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 		}
 
 		var storage get.Storage
-		if storageType == "file" {
+		switch storageType {
+		case "file":
 			storage = get.NewFileStorage(filepath.Join(config.Storage.Path, filepath.FromSlash(repoURL.Path)))
-		}
-		if storageType == "s3" {
+		case "s3":
 			storage, err = get.NewS3Storage(config.Storage.AccessKeyID, config.Storage.AccessKeyID, config.Storage.Region, config.Storage.Bucket+repoURL.Path)
 			if err != nil {
 				return nil, err
 			}
+		case "gcp":
+			storage, err = get.NewGCStorage(config.Storage.JsonPath, config.Storage.Region, config.Storage.ProjectID, config.Storage.Bucket)
+			if err != nil {
+				return nil, err
+			}
 		}
-
 		result = append(result, get.NewSyncer(*repoURL, archs, storage))
 	}
 
@@ -144,4 +172,7 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 
 func init() {
 	RootCmd.AddCommand(syncCmd)
+	RootCmd.PersistentFlags().StringVarP(&thisRepo, "repository", "r", "", "flag that can specifies a single repo (example: SLES11-SP4-Updates)")
+	RootCmd.PersistentFlags().StringVarP(&archs, "arch", "a", "", "flag that specifies covered archs in the given repo")
+	RootCmd.PersistentFlags().BoolVarP(&syncLegacyPackages, "legacypackages", "l", false, "flag that triggers mirroring of i586 pkgs in x86_64 repos")
 }

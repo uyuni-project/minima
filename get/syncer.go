@@ -77,7 +77,8 @@ type RepoType struct {
     Noarch string
 }
 
-var repoTypes = map[string]RepoType {
+var (
+repoTypes = map[string]RepoType {
 	"rpm": RepoType {
 		MetadataPath: "repodata/repomd.xml",
 		PackagesType: "primary",
@@ -99,7 +100,8 @@ var repoTypes = map[string]RepoType {
         Noarch: "all",
 	},
 }
-
+Legacy bool
+)
 // Syncer syncs repos from an HTTP source to a Storage
 type Syncer struct {
 	// URL of the repo this syncer syncs
@@ -194,13 +196,13 @@ func (r *Syncer) downloadStore(path string, description string) error {
 // downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
 func (r *Syncer) downloadStoreApply(relativePath string, checksum string, description string, hash crypto.Hash, f util.ReaderConsumer) error {
 	log.Printf("Downloading %v...", description)
+	//log.Printf("SYNCER: %v\n", r)
 	url := r.URL
 	url.Path = path.Join(r.URL.Path, relativePath)
 	body, err := ReadURL(url.String())
 	if err != nil {
 		return err
 	}
-
 	return util.Compose(r.storage.StoringMapper(relativePath, checksum, hash), f)(body)
 }
 
@@ -383,7 +385,7 @@ func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum,
 
 	allArchs := len(r.archs) == 0
 	for _, pack := range primary.Packages {
-		if allArchs || pack.Arch == repoType.Noarch || r.archs[pack.Arch] || (r.archs["i586"] && pack.Arch == "i686") {
+		if allArchs || pack.Arch == repoType.Noarch || r.archs[pack.Arch] || (r.archs["i586"] && pack.Arch == "i686") || (Legacy && (r.archs["x86_64"] && (pack.Arch == "i586" || pack.Arch == "i686"))) {
 			decision := r.decide(pack.Location.Href, pack.Checksum, checksumMap)
 			switch decision {
 			case Download:
