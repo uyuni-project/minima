@@ -50,6 +50,7 @@ to quickly create a Cobra application.`,
 	justSearch bool
 	thisMU string
 	cleanup bool
+	autoApprove bool
 )
 
 func init() {
@@ -58,6 +59,7 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&justSearch, "search", "s", false, "flag that would trigger only looking for updates on OBS")
 	RootCmd.PersistentFlags().StringVarP(&thisMU, "maintupdate", "m", "", "flag that consumes the name of an MU, like 'SUSE:Maintenance:Incident:ReleaseRequest'")
 	RootCmd.PersistentFlags().BoolVarP(&cleanup, "cleanup", "k", false, "flag that triggers cleaning up the storage (from old MU channels)")
+	RootCmd.PersistentFlags().BoolVar(&autoApprove, "auto-approve", false, "triggers automatic deleting of repositories")
 }
 
 func muFindAndSync() {
@@ -74,7 +76,7 @@ func muFindAndSync() {
 		if err != nil {
 			log.Fatalf("There is an error: %v", err)
 		}
-		err = RemoveOldChannels(config, updateList)
+		err = RemoveOldChannels(config, updateList, autoApprove)
 		if err != nil {
 			log.Fatalf("There is an error: %v", err)
 		}
@@ -261,33 +263,61 @@ func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updat
 	return updlist, err
 }
 
-func RemoveOldChannels(config Config, updates []Updates) (err error) {
+func RemoveOldChannels(config Config, updates []Updates, deleteNow bool) (err error) {
 	mappedUpdates := MakeAMap(updates)
+	fmt.Printf("Mapped Updates: %s\n", mappedUpdates)
 	switch config.Storage.Type {
 	case "file":
 		var muChannelList []string
-		err = filepath.Walk(filepath.Join(config.Storage.Path, "ibs/SUSE:/Maintenance:/"), func(path string, info os.FileInfo, err error) error {
-			if info.IsDir() {
-				muChannelList = append(muChannelList, path)
-			}
-			return nil
-		})
-		if err != nil {
-			return 
-		}
-		//templ := regexp.MustCompile(`/\d{5,6}/`)
-		for _, elem := range muChannelList {
-			if regexp.MustCompile(`/\d{5,6}/`).FindString(elem) != "" {
-				_, exists := mappedUpdates[strings.Replace(regexp.MustCompile(`/\d{5,6}/`).FindString(elem), "/", "", 10)] 
-				if !exists {
-					log.Printf("removing: %s...\n", elem)
-					err = os.RemoveAll(elem)
-					if err != nil {
-						return
+		if _, err := os.Stat(filepath.Join(config.Storage.Path, "ibs/SUSE:/Maintenance:/")); os.IsNotExist(err) {
+			log.Printf("This path: \"%s\" does not exist! Check your mirror...\n")
+		} else {
+			err = filepath.Walk(filepath.Join(config.Storage.Path, "ibs/SUSE:/Maintenance:/"), func(path string, info os.FileInfo, err error) error {
+				if info.Name() == "repodata" {
+					muChannelList = append(muChannelList, path)
+				}
+				if info.IsDir() {
+					if files, err := ioutil.ReadDir(path); len(files) == 0  {
+						if err != nil {
+							log.Fatal(err)
+						}
+						log.Printf("Removing unused empty folders: %s\n", path)
+						os.RemoveAll(filepath.Join(config.Storage.Path, "ibs/SUSE:/Maintenance:/", path))
 					}
 				}
-			}			
-		}	
+				return nil
+				})
+		}
+			if err != nil {
+				return
+			}
+		//List of repositories that will be deleted: reposToDel
+		var reposToDel map[string]bool
+		fmt.Printf("MuchannelList: %v\n", muChannelList)
+		for _, elem := range muChannelList {
+				if regexp.MustCompile(`/\d{5,6}/`).FindString(elem) != "" {
+					_, exists := mappedUpdates[strings.Replace(regexp.MustCompile(`/\d{5,6}/`).FindString(elem), "/", "", 10)]
+					if !exists {
+						if deleteNow {
+							log.Printf("removing: %s...\n", elem)
+							err = os.RemoveAll(elem)
+							if err != nil {
+								return
+							}
+						} else {
+							reposToDel[elem] = true
+						}
+					}
+				}
+		}
+		log.Println("Mirror will have following changes:")
+		if reposToDel == nil {
+			log.Println("...there is nothing to delete!")
+		}
+		for index, _ := range reposToDel {
+			fmt.Printf("- %s", index)
+		}
+	case "s3":
 	}
 	return
 }
@@ -295,7 +325,19 @@ func RemoveOldChannels(config Config, updates []Updates) (err error) {
 func MakeAMap(updates []Updates) (updatesMap map[string]bool){
 	updatesMap = make(map[string]bool)
 	for _, elem := range updates {
+		if elem.IncidentNumber == "" {
+			elem.IncidentNumber = fmt.Sprintf("%s", elem.Repositories[0])
+		}
 		updatesMap[elem.IncidentNumber] = true
+	}
+	return
+}
+
+func CheckIFMapHasKey(updatesMap map[string]bool, prefix, elem string) (yes bool) {
+	for key, _ := range updatesMap {
+		if strings.Contains(key, strings.Replace(elem, prefix, "", 1)) {
+			yes = true
+		}
 	}
 	return
 }
