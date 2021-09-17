@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/uyuni-project/minima/get"
 	yaml "gopkg.in/yaml.v2"
@@ -166,7 +168,9 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 		}
 		result = append(result, get.NewSyncer(*repoURL, archs, storage))
 	}
-
+	if cleanup {
+		RemoveOldChannelsFromFileStorage(config)
+	}
 	return
 }
 
@@ -175,4 +179,67 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&thisRepo, "repository", "r", "", "flag that can specifies a single repo (example: SLES11-SP4-Updates)")
 	RootCmd.PersistentFlags().StringVarP(&archs, "arch", "a", "", "flag that specifies covered archs in the given repo")
 	RootCmd.PersistentFlags().BoolVarP(&syncLegacyPackages, "legacypackages", "l", false, "flag that triggers mirroring of i586 pkgs in x86_64 repos")
+}
+
+func RemoveOldChannelsFromFileStorage (config Config) (err error) {
+		// DO CLEANUP - TO BE IMPLEMENTED
+		log.Println("searching for outdated repositories...")
+		//fmt.Printf("List of Repos from config: %s  ---> %s\n", config.SCC.RepoNames, config.HTTP)
+		mappedRepos := make(map[string]bool)
+		var urlink *url.URL
+		for _, elem := range config.HTTP {
+			urlink, err = url.Parse(elem.URL)
+			if err != nil {
+				panic(err)
+			}
+			mappedRepos[filepath.Join(config.Storage.Path, urlink.Path)] = true
+		}
+			//fmt.Printf("MAPPED REPOS: %v\n", mappedRepos)
+			path := config.Storage.Path
+			muChannelList := make(map[string]bool)
+			filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+				if info.IsDir() {
+					if info.Name() == "repodata" {
+						muChannelList[strings.Replace(path, "/repodata", "", 1)] = true
+						return nil
+					}
+					if files, err := ioutil.ReadDir(path); len(files) == 0 && path != config.Storage.Path {
+						if err != nil {
+							log.Fatal(err)
+						}
+						log.Printf("Removing unused empty folders: %s\n", path)
+						os.RemoveAll(path)
+					}
+				}
+				return nil
+			})
+			//fmt.Printf("CHANNEL LIST: %v\n", muChannelList)
+			for ind, _ := range muChannelList {
+				if mappedRepos[ind] {
+					log.Printf("Repo %s is registered...\n", ind)
+				} else {
+					log.Printf("Repo %s is not registered in the yaml file...", ind)
+					if autoApprove {
+						log.Printf("Removing repo %s ...\n", ind)
+						os.RemoveAll(ind)
+					} else {
+						prompt := promptui.Select{
+							Label: fmt.Sprintf("Delete repo: %s ??? [Yes/No]", ind),
+							Items: []string{"Yes", "No"},
+						}
+						_, result, err := prompt.Run()
+						if err != nil {
+							log.Fatalf("Prompt failed %v\n", err)
+						}
+						if result == "Yes" {
+							log.Printf("Removing repo: %s ...\n", ind)
+							os.RemoveAll(ind)
+						} else {
+							log.Printf("Keeping repo: %s ...\n", ind)
+						}
+					}
+				}
+			}
+		log.Println("...done!")
+	return
 }

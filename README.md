@@ -48,9 +48,25 @@ http:
 To sync repositories, use `minima sync`.
 
 To search for new MU repositories, use `minima updates -s`.
+
 To search and sync automatically all the new MU repositories:
 use `minima updates`.
 
+To cleanup obsolete repositories, use `--cleanup` option. It should be ran whether with 
+sync or updates accordingly:
+```
+./minima sync --cleanup
+```
+or
+```
+./minima updates --cleanup
+```
+If a repository that is not specified in the minima.yaml config file will be identified,
+you will be prompted to keep or delete it. If you want to automatically delete all the
+repositories that are not specified in minima.yaml, run:
+```
+./minima sync --cleanup --auto-approve
+```
 
 ## How to contribute
 

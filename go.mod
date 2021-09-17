@@ -11,6 +11,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.0.0-20160803190731-bd40a432e4c7 // indirect
 	github.com/jtolds/gls v4.2.1+incompatible // indirect
+	github.com/manifoldco/promptui v0.8.0
 	github.com/smartystreets/assertions v0.0.0-20170818220048-9c0ea8acbc1d // indirect
 	github.com/smartystreets/goconvey v0.0.0-20170825221426-e5b2b7c91115 // indirect
 	github.com/smartystreets/gunit v0.0.0-20170705041418-d235ada78c07 // indirect
