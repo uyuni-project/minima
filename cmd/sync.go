@@ -158,11 +158,6 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 			if err != nil {
 				return nil, err
 			}
-		case "gcp":
-			storage, err = get.NewGCStorage(config.Storage.JsonPath, config.Storage.Region, config.Storage.ProjectID, config.Storage.Bucket)
-			if err != nil {
-				return nil, err
-			}
 		}
 		result = append(result, get.NewSyncer(*repoURL, archs, storage))
 	}
