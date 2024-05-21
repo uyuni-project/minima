@@ -256,6 +256,8 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 		return
 	})
 	if err != nil {
+		log.Printf(err.Error())
+		log.Printf("Fallback to next repo type")
 		// attempt to download Debian's Release file
 		err = r.downloadStoreApply(releasePath, "", path.Base(releasePath), 0, func(reader io.ReadCloser) (err error) {
 			err = doProcessMetadata(reader, repoTypes["deb"])
