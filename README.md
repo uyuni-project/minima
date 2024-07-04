@@ -58,3 +58,4 @@ use `minima updates`.
    - set the `PATH` environment variable (eg. in `~/.bashrc`)
  - grab the project sources: `cd $GOPATH; go get github.com/uyuni-project/minima`
  - install development utilities: `go get -u github.com/spf13/cobra/cobra github.com/govend/govend`
+ - Make sure you have Git commit signing enabled. If you are not doing it already, check out the [GitHub documentation](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification).
