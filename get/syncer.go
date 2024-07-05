@@ -12,15 +12,17 @@ import (
 	"log"
 	"net/url"
 	"path"
+	"path/filepath"
 	"strings"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/uyuni-project/minima/util"
 	"golang.org/x/crypto/openpgp"
 )
 
 // common
 
-// XMLLocation maps a <location> tag in repodata/repomd.xml or repodata/<ID>-primary.xml.gz
+// XMLLocation maps a <location> tag in repodata/repomd.xml or repodata/<ID>-primary.xml.<compression>
 type XMLLocation struct {
 	Href string `xml:"href,attr"`
 }
@@ -39,21 +41,21 @@ type XMLData struct {
 	Checksum XMLChecksum `xml:"checksum"`
 }
 
-// repodata/<ID>-primary.xml.gz
+// repodata/<ID>-primary.xml.<compression>
 
-// XMLMetaData maps a <metadata> tag in repodata/<ID>-primary.xml.gz
+// XMLMetaData maps a <metadata> tag in repodata/<ID>-primary.xml.<compression>
 type XMLMetaData struct {
 	Packages []XMLPackage `xml:"package"`
 }
 
-// XMLPackage maps a <package> tag in repodata/<ID>-primary.xml.gz
+// XMLPackage maps a <package> tag in repodata/<ID>-primary.xml.<compression>
 type XMLPackage struct {
 	Arch     string      `xml:"arch"`
 	Location XMLLocation `xml:"location"`
 	Checksum XMLChecksum `xml:"checksum"`
 }
 
-// XMLChecksum maps a <checksum> tag in repodata/<ID>-primary.xml.gz
+// XMLChecksum maps a <checksum> tag in repodata/<ID>-primary.xml.<compression>
 type XMLChecksum struct {
 	Type     string `xml:"type,attr"`
 	Checksum string `xml:",cdata"`
@@ -72,7 +74,7 @@ type RepoType struct {
 	MetadataPath string
 	PackagesType string
 	DecodeMetadata func(io.Reader) (XMLRepomd, error)
-	DecodePackages func(io.Reader) (XMLMetaData, error)
+	DecodePackages func(io.Reader, string) (XMLMetaData, error)
 	MetadataSignatureExt string
     Noarch string
 }
@@ -313,18 +315,34 @@ func (e *SignatureError) Error() string {
 	return fmt.Sprintf("Signature error: %s", e.reason)
 }
 
-func readMetaData(reader io.Reader) (primary XMLMetaData, err error) {
-	gzReader, err := gzip.NewReader(reader)
-	if err != nil {
-		return
+// Uncompress and read primary XML
+func readMetaData(reader io.Reader, compType string) (XMLMetaData, error) {
+	var primary XMLMetaData
+	switch compType {
+	case "gz":
+		reader, err := gzip.NewReader(reader)
+		if err != nil {
+			return primary, err
+		}
+		defer reader.Close()
+
+		decoder := xml.NewDecoder(reader)
+		err = decoder.Decode(&primary)
+	case "zst":
+		reader, err := zstd.NewReader(reader)
+		if err != nil {
+			return primary, err
+		}
+		defer reader.Close()
+
+		decoder := xml.NewDecoder(reader)
+		err = decoder.Decode(&primary)
+	default:
+		return primary, errors.New("Unsupported compression type")
 	}
-	defer gzReader.Close()
-
-	decoder := xml.NewDecoder(gzReader)
-	err = decoder.Decode(&primary)
-
-	return
+	return primary, nil
 }
+
 
 func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 	checksumMap = make(map[string]XMLChecksum)
@@ -361,7 +379,8 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 			if err != nil {
 				return
 			}
-			primary, err := repoType.DecodePackages(primaryReader)
+			compType := strings.Trim(filepath.Ext(dataHref), ".")
+			primary, err := repoType.DecodePackages(primaryReader, compType)
 			if err != nil {
 				return
 			}
@@ -380,7 +399,8 @@ func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum,
 	if err != nil {
 		return
 	}
-	primary, err := repoType.DecodePackages(reader)
+	compType := strings.Trim(filepath.Ext(path), ".")
+	primary, err := repoType.DecodePackages(reader, compType)
 	if err != nil {
 		return
 	}
@@ -473,7 +493,7 @@ func decodeRelease(reader io.Reader) (repomd XMLRepomd, err error) {
 	return
 }
 
-func decodePackages(reader io.Reader) (metadata XMLMetaData, err error) {
+func decodePackages(reader io.Reader, _ string) (metadata XMLMetaData, err error) {
 	packagesEntries, err := util.ProcessPropertiesFile(reader)
 	if err != nil {
 		return
