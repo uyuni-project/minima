@@ -35,10 +35,22 @@ type Repo struct {
 	DistroTarget string `json:"distro_target"`
 }
 
+// maps a repo name to the available archs for it
+type sccMap map[string][]string
+
 // SCCToHTTPConfigs returns HTTPS repos configurations (URL and archs) for repos in SCC
 func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfigs []SCCReposConfig) ([]HTTPRepoConfig, error) {
 	token := base64.URLEncoding.EncodeToString([]byte(username + ":" + password))
 	httpConfigs := []HTTPRepoConfig{}
+
+	// build a map of name - available archs entries to avoid repeated iterations
+	// on sccConfigs when searching repos by name and archs
+	sccEntries := make(sccMap)
+	for _, config := range sccConfigs {
+		for _, name := range config.Names {
+			sccEntries[name] = config.Archs
+		}
+	}
 
 	var page []byte
 	var err error
@@ -59,7 +71,7 @@ func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfi
 
 		for _, repo := range repos {
 			fmt.Printf("  %s: %s\n", repo.Name, repo.Description)
-			config, ok := matchConfigs(repo.Name, repo.Description, repo.URL, sccConfigs)
+			config, ok := getHTTPConfig(repo.Name, repo.Description, repo.URL, sccEntries)
 			if ok {
 				httpConfigs = append(httpConfigs, config)
 			}
@@ -73,28 +85,25 @@ func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfi
 	return httpConfigs, nil
 }
 
-// matchConfigs attempts to match the given name and description to one of the given SCCReposConfig
-// and build a HTTRepoConfig for it.
+// getHTTPConfig attempts to match the given repo name and description to one of the given
+// sccMap entries and build a HTTRepoConfig for it.
 //
 // Returns a HTTPRepoConfig and a bool indicating whether the match was successfull or not.
-func matchConfigs(name, description, url string, repoConfigs []SCCReposConfig) (HTTPRepoConfig, bool) {
+func getHTTPConfig(name, description, url string, sccEntries sccMap) (HTTPRepoConfig, bool) {
 	httpConfig := HTTPRepoConfig{
 		Archs: []string{},
 	}
 
-	for _, config := range repoConfigs {
-		for _, repoName := range config.Names {
-			if strings.Contains(name, repoName) {
-				for _, arch := range config.Archs {
-					if strings.Contains(description, arch) {
-						httpConfig.Archs = append(httpConfig.Archs, arch)
-					}
-				}
-				if len(httpConfig.Archs) > 0 {
-					httpConfig.URL = url
-					return httpConfig, true
-				}
+	repoArchs, ok := sccEntries[name]
+	if ok {
+		for _, arch := range repoArchs {
+			if strings.Contains(description, arch) {
+				httpConfig.Archs = append(httpConfig.Archs, arch)
 			}
+		}
+		if len(httpConfig.Archs) > 0 {
+			httpConfig.URL = url
+			return httpConfig, true
 		}
 	}
 	return httpConfig, false
