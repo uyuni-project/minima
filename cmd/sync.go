@@ -13,12 +13,14 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+const sccUrl = "https://scc.suse.com"
+
 // syncCmd represents the sync command
 var (
 	syncCmd = &cobra.Command{
-	Use:   "sync",
-	Short: "Synchronizes repos from remote locations",
-	Long: `Synchronizes content in repos to a directory or an S3 bucket.
+		Use:   "sync",
+		Short: "Synchronizes repos from remote locations",
+		Long: `Synchronizes content in repos to a directory or an S3 bucket.
 
   You can specify configuration in YAML either in a file or the MINIMA_CONFIG environment variable.
 
@@ -46,31 +48,31 @@ var (
     #     - SLES12-SP2-LTSS-Updates
     #   archs: [x86_64]
   `,
-	Run: func(cmd *cobra.Command, args []string) {
-		var errorflag bool = false
-		syncers, err := syncersFromConfig(cfgString)
-		if err != nil {
-			log.Fatal(err)
-			errorflag = true
-		}
-		for _, syncer := range syncers {
-			log.Printf("Processing repo: %s", syncer.URL.String())
-			err := syncer.StoreRepo()
+		Run: func(cmd *cobra.Command, args []string) {
+			var errorflag bool = false
+			syncers, err := syncersFromConfig(cfgString)
 			if err != nil {
-				log.Println(err)
+				log.Fatal(err)
 				errorflag = true
-			} else {
-				log.Println("...done.")
 			}
-		}
-		if errorflag {
-			os.Exit(1)
-		}
-	},
-}
-thisRepo string
-archs string
-syncLegacyPackages bool
+			for _, syncer := range syncers {
+				log.Printf("Processing repo: %s", syncer.URL.String())
+				err := syncer.StoreRepo()
+				if err != nil {
+					log.Println(err)
+					errorflag = true
+				} else {
+					log.Println("...done.")
+				}
+			}
+			if errorflag {
+				os.Exit(1)
+			}
+		},
+	}
+	thisRepo           string
+	archs              string
+	syncLegacyPackages bool
 )
 
 // Config maps the configuraiton in minima.yaml
@@ -84,38 +86,32 @@ type Config struct {
 		SecretAccessKey string `yaml:"secret_access_key"`
 		Region          string
 		Bucket          string
-		JsonPath		string `yaml:"jsonpath"`
-		ProjectID		string `yaml:"projectid"`
+		JsonPath        string `yaml:"jsonpath"`
+		ProjectID       string `yaml:"projectid"`
 	}
 
 	SCC struct {
-		Username  string
-		Password  string
-		RepoNames []string `yaml:"repo_names"`
-		Archs     []string
+		Username     string
+		Password     string
+		Repositories []get.SCCReposConfig
 	}
 	OBS struct {
-		Username	string
-		Password	string
+		Username string
+		Password string
 	}
-	HTTP []HTTPRepoConfig
+	HTTP []get.HTTPRepoConfig
 }
 
-// HTTPRepoConfig defines the configuration of an HTTP repo
-type HTTPRepoConfig struct {
-	URL   string
-	Archs []string
-}
-
-func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
+func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 	config := Config{}
-	err = yaml.Unmarshal([]byte(configString), &config)
+	if err := yaml.Unmarshal([]byte(configString), &config); err != nil {
+		return nil, fmt.Errorf("configuration parse error: %v", err)
+	}
 
 	storageType := config.Storage.Type
-	if storageType != "file" && storageType != "s3" && storageType != "gcp"{
+	if storageType != "file" && storageType != "s3" && storageType != "gcp" {
 		return nil, fmt.Errorf("configuration parse error: unrecognised storage type")
 	}
-
 	//---passing the flag value to a global variable in get package, to trigger syncing of i586 rpms inside x86_64
 	get.Legacy = syncLegacyPackages
 
@@ -124,20 +120,22 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 			if archs == "" {
 				archs = "x86_64"
 			}
-			config.SCC.RepoNames = []string{thisRepo}
-			config.SCC.Archs = strings.Split(archs, ",")
+			config.SCC.Repositories = []get.SCCReposConfig{
+				{
+					Names: []string{thisRepo},
+					Archs: strings.Split(archs, ","),
+				},
+			}
 		}
 
-		httpURLs, err := get.SCCURLs("https://scc.suse.com", config.SCC.Username, config.SCC.Password, config.SCC.RepoNames, config.SCC.Archs)
+		httpRepoConfigs, err := get.SCCToHTTPConfigs(sccUrl, config.SCC.Username, config.SCC.Password, config.SCC.Repositories)
 		if err != nil {
 			return nil, err
 		}
-
-		for _, httpURL := range httpURLs {
-			config.HTTP = append(config.HTTP, HTTPRepoConfig{httpURL, config.SCC.Archs})
-		}
+		config.HTTP = append(config.HTTP, httpRepoConfigs...)
 	}
 
+	syncers := []*get.Syncer{}
 	for _, httpRepo := range config.HTTP {
 		repoURL, err := url.Parse(httpRepo.URL)
 		if err != nil {
@@ -159,10 +157,10 @@ func syncersFromConfig(configString string) (result []*get.Syncer, err error) {
 				return nil, err
 			}
 		}
-		result = append(result, get.NewSyncer(*repoURL, archs, storage))
+		syncers = append(syncers, get.NewSyncer(*repoURL, archs, storage))
 	}
 
-	return
+	return syncers, nil
 }
 
 func init() {
