@@ -10,6 +10,12 @@ import (
 	"strings"
 )
 
+type SCC struct {
+	Username     string
+	Password     string
+	Repositories []SCCReposConfig
+}
+
 // SCCRepoConfig defines the configuration of SCC repos sharing the same architectures
 type SCCReposConfig struct {
 	Names []string

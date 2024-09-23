@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/uyuni-project/minima/get"
+	"github.com/uyuni-project/minima/updates"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -77,40 +78,16 @@ var (
 
 // Config maps the configuraiton in minima.yaml
 type Config struct {
-	Storage struct {
-		Type string
-		// file-specific
-		Path string
-		// s3-specific
-		AccessKeyID     string `yaml:"access_key_id"`
-		SecretAccessKey string `yaml:"secret_access_key"`
-		Region          string
-		Bucket          string
-		JsonPath        string `yaml:"jsonpath"`
-		ProjectID       string `yaml:"projectid"`
-	}
-
-	SCC struct {
-		Username     string
-		Password     string
-		Repositories []get.SCCReposConfig
-	}
-	OBS struct {
-		Username string
-		Password string
-	}
-	HTTP []get.HTTPRepoConfig
+	Storage get.StorageConfig
+	SCC     get.SCC
+	OBS     updates.OBS
+	HTTP    []get.HTTPRepoConfig
 }
 
 func syncersFromConfig(configString string) ([]*get.Syncer, error) {
-	config := Config{}
-	if err := yaml.Unmarshal([]byte(configString), &config); err != nil {
-		return nil, fmt.Errorf("configuration parse error: %v", err)
-	}
-
-	storageType := config.Storage.Type
-	if storageType != "file" && storageType != "s3" && storageType != "gcp" {
-		return nil, fmt.Errorf("configuration parse error: unrecognised storage type")
+	config, err := parseConfig(configString)
+	if err != nil {
+		return nil, err
 	}
 	//---passing the flag value to a global variable in get package, to trigger syncing of i586 rpms inside x86_64
 	get.Legacy = syncLegacyPackages
@@ -148,7 +125,7 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 		}
 
 		var storage get.Storage
-		switch storageType {
+		switch config.Storage.Type {
 		case "file":
 			storage = get.NewFileStorage(filepath.Join(config.Storage.Path, filepath.FromSlash(repoURL.Path)))
 		case "s3":
@@ -161,6 +138,19 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 	}
 
 	return syncers, nil
+}
+
+func parseConfig(configString string) (Config, error) {
+	config := Config{}
+	if err := yaml.Unmarshal([]byte(configString), &config); err != nil {
+		return config, fmt.Errorf("configuration parse error: %v", err)
+	}
+
+	storageType := config.Storage.Type
+	if storageType != "file" && storageType != "s3" && storageType != "gcp" {
+		return config, fmt.Errorf("configuration parse error: unrecognised storage type")
+	}
+	return config, nil
 }
 
 func init() {

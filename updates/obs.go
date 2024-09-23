@@ -11,6 +11,11 @@ import (
 	"net/url"
 )
 
+type OBS struct {
+	Username string
+	Password string
+}
+
 func (c *Client) NewRequest(method, path string, body interface{}) (*http.Request, error) {
 	rel := &url.URL{Path: path}
 	u := c.BaseURL.ResolveReference(rel)
@@ -85,13 +90,13 @@ func NewClient(username string, password string) *Client {
 }
 
 func CheckWebPageExists(repoURL string) (bool, error) {
- 	client := &http.Client{}
+	client := &http.Client{}
 	resp, err := client.Head(repoURL)
 	if err != nil {
 		return false, err
 	}
 	if resp.Status == "200 OK" {
-		return true, nil 
+		return true, nil
 	}
-		return false, nil
+	return false, nil
 }
