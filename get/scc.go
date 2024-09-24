@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// SCC defines the configuration to be used for downloading packages from SUSE Customer Center
 type SCC struct {
 	Username     string
 	Password     string
@@ -28,6 +29,7 @@ type HTTPRepoConfig struct {
 	Archs []string
 }
 
+// Repo represents the JSON entry for a repository as retuned by SCC API
 type Repo struct {
 	URL          string
 	Name         string

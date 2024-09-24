@@ -45,9 +45,11 @@ var (
     # scc:
     #   username: UC7
     #   password: INSERT_PASSWORD_HERE
-    #   repo_names:
-    #     - SLES12-SP2-LTSS-Updates
-    #   archs: [x86_64]
+    #   repositories:
+	#     - names:
+    #       - SLE-Product-SLES15-SP5-Pool
+	#       - SLE-Product-SLES15-SP5-Updates
+    #       archs: [x86_64]
   `,
 		Run: func(cmd *cobra.Command, args []string) {
 			var errorflag bool = false
