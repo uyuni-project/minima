@@ -76,7 +76,7 @@ var (
 	syncLegacyPackages bool
 )
 
-// Config maps the configuraiton in minima.yaml
+// Config maps the configuration in minima.yaml
 type Config struct {
 	Storage get.StorageConfig
 	SCC     get.SCC
@@ -147,7 +147,7 @@ func parseConfig(configString string) (Config, error) {
 	}
 
 	storageType := config.Storage.Type
-	if storageType != "file" && storageType != "s3" && storageType != "gcp" {
+	if storageType != "file" && storageType != "s3" {
 		return config, fmt.Errorf("configuration parse error: unrecognised storage type")
 	}
 	return config, nil
