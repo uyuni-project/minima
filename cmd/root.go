@@ -26,7 +26,7 @@ var RootCmd = &cobra.Command{
 			os.Exit(0)
 		}
 
-		initConfig()
+		cmd.Help()
 	},
 }
 
@@ -41,8 +41,10 @@ func Execute(versionTag string) {
 }
 
 func init() {
-	RootCmd.Flags().BoolP("version", "v", false, "Print minima version")
+	// all sub-commands will have access to this flag
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "minima.yaml", "config file")
+	// local flags
+	RootCmd.Flags().BoolP("version", "v", false, "Print minima version")
 }
 
 // initConfig reads in config file and ENV variables if set.

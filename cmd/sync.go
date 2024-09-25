@@ -52,6 +52,8 @@ var (
     #       archs: [x86_64]
   `,
 		Run: func(cmd *cobra.Command, args []string) {
+			initConfig()
+
 			var errorflag bool = false
 			syncers, err := syncersFromConfig(cfgString)
 			if err != nil {
@@ -157,7 +159,8 @@ func parseConfig(configString string) (Config, error) {
 
 func init() {
 	RootCmd.AddCommand(syncCmd)
-	RootCmd.PersistentFlags().StringVarP(&thisRepo, "repository", "r", "", "flag that can specifies a single repo (example: SLES11-SP4-Updates)")
-	RootCmd.PersistentFlags().StringVarP(&archs, "arch", "a", "", "flag that specifies covered archs in the given repo")
-	RootCmd.PersistentFlags().BoolVarP(&syncLegacyPackages, "legacypackages", "l", false, "flag that triggers mirroring of i586 pkgs in x86_64 repos")
+	// local flags
+	syncCmd.Flags().StringVarP(&thisRepo, "repository", "r", "", "flag that can specifies a single repo (example: SLES11-SP4-Updates)")
+	syncCmd.Flags().StringVarP(&archs, "arch", "a", "", "flag that specifies covered archs in the given repo")
+	syncCmd.Flags().BoolVarP(&syncLegacyPackages, "legacypackages", "l", false, "flag that triggers mirroring of i586 pkgs in x86_64 repos")
 }

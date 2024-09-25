@@ -36,7 +36,7 @@ import (
 
 // mufnsCmd represents the mufns command
 var (
-	update = &cobra.Command{
+	updateCmd = &cobra.Command{
 		Use:   "updates",
 		Short: "searches all updates and syncs them to mirror",
 		Long: `A longer description that spans multiple lines and likely contains examples
@@ -46,6 +46,7 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			initConfig()
 			muFindAndSync()
 		},
 	}
@@ -56,11 +57,12 @@ to quickly create a Cobra application.`,
 )
 
 func init() {
-	RootCmd.AddCommand(update)
-	RootCmd.PersistentFlags().BoolVarP(&spitYamls, "yaml", "y", false, "flag that would trigger generating minima_obs_<Date>.yaml configs")
-	RootCmd.PersistentFlags().BoolVarP(&justSearch, "search", "s", false, "flag that would trigger only looking for updates on OBS")
-	RootCmd.PersistentFlags().StringVarP(&thisMU, "maintupdate", "m", "", "flag that consumes the name of an MU, like 'SUSE:Maintenance:Incident:ReleaseRequest'")
-	RootCmd.PersistentFlags().BoolVarP(&cleanup, "cleanup", "k", false, "flag that triggers cleaning up the storage (from old MU channels)")
+	RootCmd.AddCommand(updateCmd)
+	// local flags
+	updateCmd.Flags().BoolVarP(&spitYamls, "yaml", "y", false, "flag that would trigger generating minima_obs_<Date>.yaml configs")
+	updateCmd.Flags().BoolVarP(&justSearch, "search", "s", false, "flag that would trigger only looking for updates on OBS")
+	updateCmd.Flags().StringVarP(&thisMU, "maintupdate", "m", "", "flag that consumes the name of an MU, like 'SUSE:Maintenance:Incident:ReleaseRequest'")
+	updateCmd.Flags().BoolVarP(&cleanup, "cleanup", "k", false, "flag that triggers cleaning up the storage (from old MU channels)")
 }
 
 func muFindAndSync() {
