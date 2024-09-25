@@ -2,26 +2,38 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 
 	"github.com/spf13/cobra"
 )
 
-var cfgFile string
-var cfgString string
+var (
+	version   string
+	cfgFile   string
+	cfgString string
+)
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "minima",
 	Short: "A Simple Linux Repository Manager",
 	Long:  "minima is an application to mirror and manage Linux package repos.",
+	Run: func(cmd *cobra.Command, args []string) {
+		versionFlag, _ := cmd.Flags().GetBool("version")
+		if versionFlag {
+			fmt.Printf("minima %s\n", version)
+			os.Exit(0)
+		}
+
+		initConfig()
+	},
 }
 
 // Execute adds all child commands to the root command sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
+func Execute(versionTag string) {
+	version = versionTag
 	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
@@ -29,8 +41,7 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
+	RootCmd.Flags().BoolP("version", "v", false, "Print minima version")
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "minima.yaml", "config file")
 }
 
@@ -46,14 +57,11 @@ func initConfig() {
 
 	// second, try from the commandline flag
 	if cfgFile != "" {
-		bytes, err := ioutil.ReadFile(cfgFile)
+		bytes, err := os.ReadFile(cfgFile)
 		if err != nil {
 			log.Fatal(err)
 		}
 		cfgString = string(bytes)
 		fmt.Println("Using config file:", cfgFile)
-		return
 	}
-
-	return
 }
