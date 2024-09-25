@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,9 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
+
 	"log"
 	"net/http"
 	"os"
@@ -27,6 +29,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/uyuni-project/minima/get"
 	"github.com/uyuni-project/minima/updates"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -34,22 +37,22 @@ import (
 // mufnsCmd represents the mufns command
 var (
 	update = &cobra.Command{
-	Use:   "updates",
-	Short: "searches all updates and syncs them to mirror",
-	Long: `A longer description that spans multiple lines and likely contains examples
+		Use:   "updates",
+		Short: "searches all updates and syncs them to mirror",
+		Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		muFindAndSync()
-	},
+		Run: func(cmd *cobra.Command, args []string) {
+			muFindAndSync()
+		},
 	}
-	spitYamls bool
+	spitYamls  bool
 	justSearch bool
-	thisMU string
-	cleanup bool
+	thisMU     string
+	cleanup    bool
 )
 
 func init() {
@@ -85,15 +88,15 @@ func muFindAndSync() {
 			if err != nil {
 				log.Fatalf("There is an error: %v", err)
 			}
-			config.HTTP = []HTTPRepoConfig{}
+			config.HTTP = []get.HTTPRepoConfig{}
 			for _, val := range updateList {
 				config.HTTP = append(config.HTTP, val.Repositories...)
 			}
-		} else {	
+		} else {
 			if mu := strings.Split(thisMU, ":"); len(mu) != 4 {
 				log.Fatalf("Badly formatted MU. It must be SUSE:Maintenance:NUMBER:NUMBER")
 			} else {
-				
+
 				a := Updates{}
 				a.IncidentNumber = mu[2]
 				a.ReleaseRequest = mu[3]
@@ -101,7 +104,7 @@ func muFindAndSync() {
 				a.Repositories, err = GetRepo(mu)
 				config.HTTP = append(config.HTTP, a.Repositories...)
 				if err != nil {
-					 log.Fatalf("Something went wrong in Repo processing: %v\n", err)
+					log.Fatalf("Something went wrong in Repo processing: %v\n", err)
 				}
 				updateList = append(updateList, a)
 			}
@@ -122,10 +125,10 @@ func muFindAndSync() {
 		}
 		if justSearch {
 			for _, value := range updateList {
-				fmt.Printf("INCIDENT: %v  RELEASEREQUEST: %v   PACKAGES: %v\n", value.IncidentNumber, value.ReleaseRequest, value.SRCRPMS )
+				fmt.Printf("INCIDENT: %v  RELEASEREQUEST: %v   PACKAGES: %v\n", value.IncidentNumber, value.ReleaseRequest, value.SRCRPMS)
 			}
 			os.Exit(3)
-		} 
+		}
 		syncers, err := syncersFromConfig(string(byteChunk))
 		if err != nil {
 			log.Fatal(err)
@@ -149,8 +152,8 @@ func muFindAndSync() {
 	//time.Sleep(60 * time.Second)
 }
 
-func ProcWebChunk(val, maint string, register map[string]bool) (r map[string]bool, httpFormattedRepos []HTTPRepoConfig, err error) {
-	var repo HTTPRepoConfig
+func ProcWebChunk(val, maint string, register map[string]bool) (r map[string]bool, httpFormattedRepos []get.HTTPRepoConfig, err error) {
+	var repo get.HTTPRepoConfig
 	if regexp.MustCompile(`^SUSE`).FindString(val) != "" {
 		val = maint + val
 		if !register[val] {
@@ -162,12 +165,12 @@ func ProcWebChunk(val, maint string, register map[string]bool) (r map[string]boo
 				register[val] = true
 				repo.URL = val
 				repo.Archs = []string{}
-				reppo := make(chan HTTPRepoConfig)
-				go func(rep HTTPRepoConfig) {
+				reppo := make(chan get.HTTPRepoConfig)
+				go func(rep get.HTTPRepoConfig) {
 					rp, _ := ArchMage(rep)
 					reppo <- rp
 				}(repo)
-				rep := <- reppo
+				rep := <-reppo
 				fmt.Println(rep)
 				httpFormattedRepos = append(httpFormattedRepos, rep)
 			} else {
@@ -179,9 +182,8 @@ func ProcWebChunk(val, maint string, register map[string]bool) (r map[string]boo
 	return r, httpFormattedRepos, err
 }
 
-
-//---- This function checks that all architecture slice of a *HTTPRepoConfig is filled right
-func ArchMage(repo HTTPRepoConfig) (HTTPRepoConfig, error) {
+// ---- This function checks that all architecture slice of a *HTTPRepoConfig is filled right
+func ArchMage(repo get.HTTPRepoConfig) (get.HTTPRepoConfig, error) {
 	archRegister := []string{"x86_64", "i586", "i686", "aarch64", "aarch64_ilp32", "ppc64le", "s390x", "src"}
 	for _, arch := range archRegister {
 		if strings.Contains(repo.URL, arch) {
@@ -199,20 +201,20 @@ func ArchMage(repo HTTPRepoConfig) (HTTPRepoConfig, error) {
 	return repo, nil
 }
 
-func GetRepo(mu string) (httpFormattedRepos []HTTPRepoConfig, err error) {
+func GetRepo(mu string) (httpFormattedRepos []get.HTTPRepoConfig, err error) {
 	resp, err := http.Get(mu)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	repos := make(chan []HTTPRepoConfig)
+	repos := make(chan []get.HTTPRepoConfig)
 	rr := make(chan map[string]bool)
 	register := make(map[string]bool)
-	for _, val := range strings.Split( string(body), "\"") {
+	for _, val := range strings.Split(string(body), "\"") {
 		go func(vl, maint string, reg map[string]bool) {
 			reg, slice, err := ProcWebChunk(vl, mu, reg)
 			if err != nil {
@@ -227,7 +229,7 @@ func GetRepo(mu string) (httpFormattedRepos []HTTPRepoConfig, err error) {
 	return httpFormattedRepos, nil
 }
 
-func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updates, err error){
+func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updates, err error) {
 	client := updates.NewClient(usr, passwd)
 	rrs, err := client.GetReleaseRequests("qam-manager", "new,review")
 	if err != nil {
@@ -237,7 +239,7 @@ func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updat
 		var update Updates
 		update.ReleaseRequest = value.Id
 
-		for i:=0; i < len(value.Actions); i++ {
+		for i := 0; i < len(value.Actions); i++ {
 			if len(strings.Split(value.Actions[i].Target.Package, ".")) > 1 {
 				update.IncidentNumber = strings.Split(value.Actions[i].Target.Package, ".")[1]
 				if update.IncidentNumber != "" {
@@ -273,12 +275,12 @@ func RemoveOldChannels(config Config, updates []Updates) (err error) {
 			return nil
 		})
 		if err != nil {
-			return 
+			return
 		}
 		//templ := regexp.MustCompile(`/\d{5,6}/`)
 		for _, elem := range muChannelList {
 			if regexp.MustCompile(`/\d{5,6}/`).FindString(elem) != "" {
-				_, exists := mappedUpdates[strings.Replace(regexp.MustCompile(`/\d{5,6}/`).FindString(elem), "/", "", 10)] 
+				_, exists := mappedUpdates[strings.Replace(regexp.MustCompile(`/\d{5,6}/`).FindString(elem), "/", "", 10)]
 				if !exists {
 					log.Printf("removing: %s...\n", elem)
 					err = os.RemoveAll(elem)
@@ -286,13 +288,13 @@ func RemoveOldChannels(config Config, updates []Updates) (err error) {
 						return
 					}
 				}
-			}			
-		}	
+			}
+		}
 	}
 	return
 }
 
-func MakeAMap(updates []Updates) (updatesMap map[string]bool){
+func MakeAMap(updates []Updates) (updatesMap map[string]bool) {
 	updatesMap = make(map[string]bool)
 	for _, elem := range updates {
 		updatesMap[elem.IncidentNumber] = true
@@ -305,5 +307,5 @@ type Updates struct {
 	ReleaseRequest string
 	SRCRPMS        []string
 	Products       string
-	Repositories     []HTTPRepoConfig
+	Repositories   []get.HTTPRepoConfig
 }

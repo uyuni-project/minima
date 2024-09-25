@@ -32,9 +32,10 @@ http:
 # scc:
 #   username: UC7
 #   password: INSERT_PASSWORD_HERE
-#   repo_names:
-#     - SLES12-SP2-LTSS-Updates
-#   archs: [x86_64]
+#   repositories:
+#     - names:
+#       - SLES12-SP2-LTSS-Updates
+#       archs: [x86_64]
 
 # OBS credentials:
 # obs:

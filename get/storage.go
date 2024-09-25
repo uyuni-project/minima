@@ -18,6 +18,19 @@ const (
 	Temporary
 )
 
+type StorageConfig struct {
+	Type string
+	// file-specific
+	Path string
+	// s3-specific
+	AccessKeyID     string `yaml:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key"`
+	Region          string
+	Bucket          string
+	JsonPath        string `yaml:"jsonpath"`
+	ProjectID       string `yaml:"projectid"`
+}
+
 // Storage allows to store data in the form of files. Files are accumulated in
 // a "temporary" location until Commit is called at that point any file in the
 // temporary location is moved in the "permanent" location
