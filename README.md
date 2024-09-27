@@ -25,8 +25,15 @@ storage:
   #
 
 http:
-  - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
-    archs: [x86_64]
+  repositories:
+    - urls:
+        - http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.2/
+        - http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
+      archs: [x86_64, aarch64]
+    - urls:
+        - http://download.opensuse.org/repositories/myrepo2/openSUSE_Leap_42.2/
+        - http://download.opensuse.org/repositories/myrepo2/openSUSE_Leap_42.3/
+      archs: [s390x, ppc64le]
 
 # optional section to download repos from SCC
 # scc:
