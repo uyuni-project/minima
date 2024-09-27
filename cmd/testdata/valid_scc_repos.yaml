@@ -7,10 +7,10 @@ scc:
   password: pass
   repositories:
     - names:
-      - SLE-Manager-Tools15-Pool
-      - SLE-Manager-Tools15-Updates
+        - SLE-Manager-Tools15-Pool
+        - SLE-Manager-Tools15-Updates
       archs: [x86_64, aarch64, s390x]
     - names:
-      - SLE-Product-SLES15-SP5-Pool
-      - SLE-Product-SLES15-SP5-Updates
+        - SLE-Product-SLES15-SP5-Pool
+        - SLE-Product-SLES15-SP5-Updates
       archs: [x86_64, s390x]

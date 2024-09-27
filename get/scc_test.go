@@ -24,78 +24,160 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 	})
 
 	http.HandleFunc("/connect/organizations/repositories2", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Link", "")
+		w.Header().Set("Link", "<http://localhost:8080/connect/organizations/repositories3>; rel=\"next\"")
 		fmt.Fprintf(w, "[{\"url\" : \"http://whatever/SLES15-SP5-Updates\", \"name\" : \"SLES15-SP5-Updates\", \"description\" : \"x86_64 aarch64 s390x ppc64le\"}]")
 	})
 
+	http.HandleFunc("/connect/organizations/repositories3", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Link", "")
+		fmt.Fprintf(w, "[{\"url\" : \"http://whatever/SLES15-SP6-Pool\", \"name\" : \"SLES15-SP6-Pool\", \"description\" : \"x86_64 aarch64\"}]")
+	})
+
 	tests := []struct {
-		name    string
-		user    string
-		pass    string
-		names   []string
-		archs   []string
-		want    []HTTPRepoConfig
-		wantErr bool
+		name     string
+		user     string
+		pass     string
+		sccInput []SCCReposConfig
+		want     []HTTPReposConfig
+		wantErr  bool
 	}{
 		{
 			"One name and no matching arch", "user", "pass",
-			[]string{"SLES15-SP5-Pool"}, []string{"s390x"},
-			[]HTTPRepoConfig{},
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool"}, []string{"s390x"}},
+			},
+			[]HTTPReposConfig{},
 			false,
 		},
 		{
 			"One name and one matching arch", "user", "pass",
-			[]string{"SLES15-SP5-Pool"}, []string{"x86_64"},
-			[]HTTPRepoConfig{
-				{URL: "http://whatever/SLES15-SP5-Pool", Archs: []string{"x86_64"}},
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool"}, []string{"x86_64"}},
+			},
+			[]HTTPReposConfig{
+				{
+					URLs:  []string{"http://whatever/SLES15-SP5-Pool"},
+					Archs: []string{"x86_64"},
+				},
 			},
 			false,
 		},
 		{
 			"One name and multiple matching archs", "user", "pass",
-			[]string{"SLES15-SP5-Pool"}, []string{"aarch64", "i586"},
-			[]HTTPRepoConfig{
-				{URL: "http://whatever/SLES15-SP5-Pool", Archs: []string{"aarch64", "i586"}},
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool"}, []string{"aarch64", "i586"}},
+			},
+			[]HTTPReposConfig{
+				{
+					URLs:  []string{"http://whatever/SLES15-SP5-Pool"},
+					Archs: []string{"aarch64", "i586"},
+				},
 			},
 			false,
 		},
 		{
 			"Multiple names and no matching archs", "user", "pass",
-			[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"src"},
-			[]HTTPRepoConfig{},
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"src"}},
+			},
+			[]HTTPReposConfig{},
 			false,
 		},
 		{
 			"Multiple names and multiple matching archs", "user", "pass",
-			[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"x86_64", "aarch64"},
-			[]HTTPRepoConfig{
-				{URL: "http://whatever/SLES15-SP5-Pool", Archs: []string{"x86_64", "aarch64"}},
-				{URL: "http://whatever/SLES15-SP5-Updates", Archs: []string{"x86_64", "aarch64"}},
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"x86_64", "aarch64"}},
+			},
+			[]HTTPReposConfig{
+				{
+					URLs:  []string{"http://whatever/SLES15-SP5-Pool", "http://whatever/SLES15-SP5-Updates"},
+					Archs: []string{"x86_64", "aarch64"},
+				},
+			},
+			false,
+		},
+		{
+			"Multiple configs and no matching archs", "user", "pass",
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"src"}},
+				{[]string{"SLES15-SP6-Pool"}, []string{"s390x"}},
+			},
+			[]HTTPReposConfig{},
+			false,
+		},
+		{
+			"Multiple configs and one matching arch in the 2nd", "user", "pass",
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"src"}},
+				{[]string{"SLES15-SP6-Pool"}, []string{"x86_64"}},
+			},
+			[]HTTPReposConfig{
+				{
+					URLs:  []string{"http://whatever/SLES15-SP6-Pool"},
+					Archs: []string{"x86_64"},
+				},
+			},
+			false,
+		},
+		{
+			"Multiple configs and multiple matching archs", "user", "pass",
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"x86_64"}},
+				{[]string{"SLES15-SP6-Pool"}, []string{"x86_64"}},
+			},
+			[]HTTPReposConfig{
+				{
+					URLs:  []string{"http://whatever/SLES15-SP5-Pool", "http://whatever/SLES15-SP5-Updates"},
+					Archs: []string{"x86_64"},
+				},
+				{
+					URLs:  []string{"http://whatever/SLES15-SP6-Pool"},
+					Archs: []string{"x86_64"},
+				},
+			},
+			false,
+		},
+		{
+			"Multiple configs and partially matching archs", "user", "pass",
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"s390x"}},
+				{[]string{"SLES15-SP6-Pool"}, []string{"x86_64"}},
+			},
+			[]HTTPReposConfig{
+				{
+					URLs:  []string{"http://whatever/SLES15-SP5-Updates"},
+					Archs: []string{"s390x"},
+				},
+				{
+					URLs:  []string{"http://whatever/SLES15-SP6-Pool"},
+					Archs: []string{"x86_64"},
+				},
 			},
 			false,
 		},
 		{
 			"Invalid user", "thiswillfail", "pass",
-			[]string{"SLES15-SP5-Pool"}, []string{"x86_64"},
-			[]HTTPRepoConfig{},
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool"}, []string{"x86_64"}},
+			},
+			[]HTTPReposConfig{},
 			true,
 		},
 		{
 			"Invalid password", "user", "thiswillfail",
-			[]string{"SLES15-SP5-Pool"}, []string{"x86_64"},
-			[]HTTPRepoConfig{},
+			[]SCCReposConfig{
+				{[]string{"SLES15-SP5-Pool"}, []string{"x86_64"}},
+			},
+			[]HTTPReposConfig{},
 			true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			httpConfigs, err := SCCToHTTPConfigs("http://localhost:8080", tt.user, tt.pass, []SCCReposConfig{
-				{
-					Names: tt.names,
-					Archs: tt.archs,
-				},
-			})
+			httpConfigs, err := SCCToHTTPConfigs("http://localhost:8080", tt.user, tt.pass, tt.sccInput)
+
+			fmt.Println(httpConfigs)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
 			assert.Equal(t, len(tt.want), len(httpConfigs))
 
@@ -103,7 +185,7 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 				wantConfig := tt.want[i]
 				gotConfig := httpConfigs[i]
 
-				assert.EqualValues(t, wantConfig.URL, gotConfig.URL)
+				assert.ElementsMatch(t, wantConfig.URLs, gotConfig.URLs)
 				assert.ElementsMatch(t, wantConfig.Archs, gotConfig.Archs)
 			}
 		})

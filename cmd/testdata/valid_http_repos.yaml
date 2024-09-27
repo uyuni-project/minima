@@ -3,7 +3,12 @@ storage:
   path: /srv/mirror
 
 http:
-  - url: http://test/SLE-Product-SLES15-SP5-Pool/
-    archs: [x86_64, aarch64, s390x]
-  - url: http://test/SLE-Product-SLES15-SP5-Updates/
-    archs: [x86_64, aarch64]
+  repositories:
+    - urls: 
+        - http://test/SLE-Product-SLES15-SP5-Pool/
+        - http://test/SLE-Product-SLES15-SP5-Updates/
+      archs: [x86_64, aarch64, s390x]
+    - urls:
+        - http://test/SLE-Product-SLES15-SP6-Pool/
+        - http://test/SLE-Product-SLES15-SP6-Updates/
+      archs: [x86_64, aarch64]

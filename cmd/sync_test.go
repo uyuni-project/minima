@@ -30,14 +30,16 @@ func TestParseConfig(t *testing.T) {
 					Type: "file",
 					Path: "/srv/mirror",
 				},
-				HTTP: []get.HTTPRepoConfig{
-					{
-						URL:   "http://test/SLE-Product-SLES15-SP5-Pool/",
-						Archs: []string{"x86_64", "aarch64", "s390x"},
-					},
-					{
-						URL:   "http://test/SLE-Product-SLES15-SP5-Updates/",
-						Archs: []string{"x86_64", "aarch64"},
+				HTTP: get.HTTP{
+					Repositories: []get.HTTPReposConfig{
+						{
+							URLs:  []string{"http://test/SLE-Product-SLES15-SP5-Pool/", "http://test/SLE-Product-SLES15-SP5-Updates/"},
+							Archs: []string{"x86_64", "aarch64", "s390x"},
+						},
+						{
+							URLs:  []string{"http://test/SLE-Product-SLES15-SP6-Pool/", "http://test/SLE-Product-SLES15-SP6-Updates/"},
+							Archs: []string{"x86_64", "aarch64"},
+						},
 					},
 				},
 			},
@@ -74,14 +76,12 @@ func TestParseConfig(t *testing.T) {
 					Type: "memory",
 					Path: "/srv/mirror",
 				},
-				HTTP: []get.HTTPRepoConfig{
-					{
-						URL:   "http://test/SLE-Product-SLES15-SP5-Pool/",
-						Archs: []string{"x86_64", "aarch64", "s390x"},
-					},
-					{
-						URL:   "http://test/SLE-Product-SLES15-SP5-Updates/",
-						Archs: []string{"x86_64", "aarch64"},
+				HTTP: get.HTTP{
+					Repositories: []get.HTTPReposConfig{
+						{
+							URLs:  []string{"http://test/SLE-Product-SLES15-SP5-Pool/", "http://test/SLE-Product-SLES15-SP5-Updates/"},
+							Archs: []string{"x86_64", "aarch64", "s390x"},
+						},
 					},
 				},
 			},
