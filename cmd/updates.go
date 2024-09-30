@@ -247,6 +247,7 @@ func GetRepo(client *http.Client, mu string) (httpFormattedRepos []get.HTTPRepoC
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving products for MU %s: %v", mu, err)
 	}
+	fmt.Printf("%d product entries for mu %s\n", len(productsChunks), mu)
 
 	reposChan := make(chan []get.HTTPRepoConfig)
 	errChan := make(chan error)
@@ -294,6 +295,7 @@ func GetRepo(client *http.Client, mu string) (httpFormattedRepos []get.HTTPRepoC
 }
 
 func getProductsForMU(client *http.Client, mu string) ([]string, error) {
+	fmt.Println("GET", mu)
 	resp, err := client.Get(mu)
 	if err != nil {
 		return nil, err
@@ -303,6 +305,7 @@ func getProductsForMU(client *http.Client, mu string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	chunks := strings.Split(string(body), "\"")
 	productsChunks := cleanWebChunks(chunks)
 
@@ -311,11 +314,12 @@ func getProductsForMU(client *http.Client, mu string) ([]string, error) {
 
 func cleanWebChunks(chunks []string) []string {
 	products := []string{}
-	regEx := regexp.MustCompile(`^SUSE`)
+	regEx := regexp.MustCompile(`>(SUSE[^<]+\/)<`)
 
 	for _, chunk := range chunks {
-		if regEx.FindString(chunk) != "" {
-			products = append(products, chunk)
+		matches := regEx.FindStringSubmatch(chunk)
+		if matches != nil {
+			products = append(products, matches[1])
 		}
 	}
 	return products

@@ -57,7 +57,9 @@ func createMockClient(baseUrl string, archs []string, forceError bool) *http.Cli
 	responses[baseUrl] = &http.Response{
 		Status:     "200 OK",
 		StatusCode: 200,
-		Body:       io.NopCloser(bytes.NewBufferString("\"SUSE_SLE-15-SP4_Update/\"\"SLE-15SP5_Update/\"\"SUSE_SLE-15-SP6_Update/\"")),
+		Body: io.NopCloser(bytes.NewBufferString(`<a href=\"/ibs/SUSE:/Maintenance:/number/SUSE_SLE-15-SP4_Update/\">SUSE_SLE-15-SP4_Update/</a>
+		<a href=\"/ibs/SUSE:/Maintenance:/number/SLE-15-SP4_Update/\">SLE-15-SP5_Update/</a>
+		<a href=\"/ibs/SUSE:/Maintenance:/number/SUSE_SLE-15-SP4_Update/\">SUSE_SLE-15-SP6_Update/</a>`)),
 	}
 
 	for _, p := range productEntries {
