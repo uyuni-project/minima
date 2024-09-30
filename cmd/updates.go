@@ -38,7 +38,7 @@ type Updates struct {
 	ReleaseRequest string
 	SRCRPMS        []string
 	Products       string
-	Repositories   []HTTPRepoConfig
+	Repositories   []get.HTTPRepoConfig
 }
 
 // package scoped array of all possible available archs to check for a repo
@@ -170,9 +170,9 @@ func muFindAndSync() {
 	//time.Sleep(60 * time.Second)
 }
 
-func ProcWebChunk(client *http.Client, product, maint string) ([]HTTPRepoConfig, error) {
-	httpFormattedRepos := []HTTPRepoConfig{}
-	repo := HTTPRepoConfig{
+func ProcWebChunk(client *http.Client, product, maint string) ([]get.HTTPRepoConfig, error) {
+	httpFormattedRepos := []get.HTTPRepoConfig{}
+	repo := get.HTTPRepoConfig{
 		Archs: []string{},
 	}
 	repoUrl := maint + product
@@ -198,7 +198,7 @@ func ProcWebChunk(client *http.Client, product, maint string) ([]HTTPRepoConfig,
 }
 
 // ---- This function checks that all architecture slice of a *HTTPRepoConfig is filled right
-func ArchMage(client *http.Client, repo *HTTPRepoConfig) error {
+func ArchMage(client *http.Client, repo *get.HTTPRepoConfig) error {
 	archsChan := make(chan string)
 	// we need a dedicated goroutine to start the others, wait for them to finish
 	// and signal back that we're done doing HTTP calls
@@ -242,13 +242,13 @@ func ArchMage(client *http.Client, repo *HTTPRepoConfig) error {
 	return nil
 }
 
-func GetRepo(client *http.Client, mu string) (httpFormattedRepos []HTTPRepoConfig, err error) {
+func GetRepo(client *http.Client, mu string) (httpFormattedRepos []get.HTTPRepoConfig, err error) {
 	productsChunks, err := getProductsForMU(client, mu)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving products for MU %s: %v", mu, err)
 	}
 
-	reposChan := make(chan []HTTPRepoConfig)
+	reposChan := make(chan []get.HTTPRepoConfig)
 	errChan := make(chan error)
 	// empty struct for 0 allocation: we need only to signal we're done, not pass data
 	doneChan := make(chan struct{})
