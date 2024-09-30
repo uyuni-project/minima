@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,10 +27,15 @@ import (
 )
 
 type mockTransport struct {
-	responses map[string]*http.Response
+	responses  map[string]*http.Response
+	forceError bool
 }
 
 func (mrt *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if mrt.forceError {
+		return nil, errors.New("Some kindof network error")
+	}
+
 	if res, ok := mrt.responses[req.URL.String()]; ok {
 		return res, nil
 	}
@@ -41,12 +47,12 @@ func (mrt *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-func createMockClient(baseUrl string, archs []string) *http.Client {
+func createMockClient(baseUrl string, archs []string, forceError bool) *http.Client {
 	responses := make(map[string]*http.Response, len(archs))
 	responses[baseUrl] = &http.Response{
 		Status:     "200 OK",
 		StatusCode: 200,
-		Body:       io.NopCloser(bytes.NewBufferString("")),
+		Body:       io.NopCloser(bytes.NewBufferString("\"SUSE_SLE-15-SP4_Update/\"\"SLE-15SP5_Update/\"\"SUSE_SLE-15SP6_Update/\"")),
 	}
 
 	for _, arch := range archs {
@@ -59,12 +65,15 @@ func createMockClient(baseUrl string, archs []string) *http.Client {
 	}
 
 	return &http.Client{
-		Transport: &mockTransport{responses: responses},
+		Transport: &mockTransport{
+			responses:  responses,
+			forceError: forceError,
+		},
 	}
 }
 
 func TestArchMage(t *testing.T) {
-	baseUrl := "http://download.suse.de/ibs/SUSA:/Maintenance:/11111/SLE-15-SP4_Update/"
+	baseUrl := "http://download.suse.de/ibs/SUSA:/Maintenance:/11111/SUSE_SLE-15-SP4_Update/"
 
 	tests := []struct {
 		name       string
@@ -83,7 +92,7 @@ func TestArchMage(t *testing.T) {
 				URL:   tt.url,
 				Archs: []string{},
 			}
-			mockClient := createMockClient(repo.URL, tt.validArchs)
+			mockClient := createMockClient(repo.URL, tt.validArchs, false)
 
 			err := ArchMage(mockClient, &repo)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
@@ -105,7 +114,7 @@ func TestProcWebChunk(t *testing.T) {
 			"Valid maint repo - arch in the url", "http://download.suse.de/ibs/SUSE:/Maintenance:/22222/", "SUSE_SLE-15-SP4_Update/x86_64/",
 			[]string{},
 			[]HTTPRepoConfig{
-				HTTPRepoConfig{
+				{
 					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/22222/SUSE_SLE-15-SP4_Update/x86_64/",
 					Archs: []string{"x86_64"},
 				},
@@ -116,7 +125,7 @@ func TestProcWebChunk(t *testing.T) {
 			"Valid maint repo - single valid arch", "http://download.suse.de/ibs/SUSE:/Maintenance:/33333/", "SUSE_SLE-15-SP4_Update/",
 			[]string{"aarch64"},
 			[]HTTPRepoConfig{
-				HTTPRepoConfig{
+				{
 					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/33333/SUSE_SLE-15-SP4_Update/",
 					Archs: []string{"aarch64"},
 				},
@@ -127,7 +136,7 @@ func TestProcWebChunk(t *testing.T) {
 			"Valid maint repo - multiple valid archs", "http://download.suse.de/ibs/SUSE:/Maintenance:/44444/", "SUSE_SLE-15-SP4_Update/",
 			[]string{"x86_64", "aarch64", "ppc64le", "s390x"},
 			[]HTTPRepoConfig{
-				HTTPRepoConfig{
+				{
 					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/44444/SUSE_SLE-15-SP4_Update/",
 					Archs: []string{"x86_64", "aarch64", "ppc64le", "s390x"},
 				},
@@ -144,7 +153,7 @@ func TestProcWebChunk(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			url := fmt.Sprintf("%s%s", tt.maint, tt.product)
-			client := createMockClient(url, tt.validArchs)
+			client := createMockClient(url, tt.validArchs, false)
 
 			got, err := ProcWebChunk(client, tt.product, tt.maint)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
@@ -155,6 +164,37 @@ func TestProcWebChunk(t *testing.T) {
 				assert.Equal(t, wantRepo.URL, gotRepo.URL)
 				assert.ElementsMatch(t, wantRepo.Archs, gotRepo.Archs)
 			}
+		})
+	}
+}
+
+func TestGetProductsForMU(t *testing.T) {
+	tests := []struct {
+		name    string
+		mu      string
+		want    []string
+		wantErr bool
+	}{
+		{
+			"Chunk without 'SUSE' is discarded",
+			"http://download.suse.de/ibs/SUSE:/Maintenance:/11111/",
+			[]string{"SUSE_SLE-15-SP4_Update/", "SUSE_SLE-15SP6_Update/"},
+			false,
+		},
+		{
+			"Network error",
+			"http://download.suse.de/ibs/SUSE:/Maintenance:/11111/",
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := createMockClient(tt.mu, []string{}, tt.wantErr)
+
+			got, err := getProductsForMU(client, tt.mu)
+			assert.EqualValues(t, tt.wantErr, (err != nil))
+			assert.ElementsMatch(t, tt.want, got)
 		})
 	}
 }
