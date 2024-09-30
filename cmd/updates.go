@@ -120,7 +120,7 @@ func muFindAndSync() {
 
 				a.Repositories, err = GetRepo(http.DefaultClient, mu)
 				if err != nil {
-					log.Fatalf("Something went wrong in Repo processing: %v\n", err)
+					log.Fatalf("Something went wrong in MU %s repos processing: %v\n", mu, err)
 				}
 				config.HTTP = append(config.HTTP, a.Repositories...)
 				updateList = append(updateList, a)
@@ -200,11 +200,13 @@ func ProcWebChunk(client *http.Client, product, maint string) ([]HTTPRepoConfig,
 // ---- This function checks that all architecture slice of a *HTTPRepoConfig is filled right
 func ArchMage(client *http.Client, repo *HTTPRepoConfig) error {
 	archsChan := make(chan string)
-
+	// we need a dedicated goroutine to start the others, wait for them to finish
+	// and signal back that we're done doing HTTP calls
 	go func() {
 		var wg sync.WaitGroup
 		wg.Add(len(architectures))
 
+		// verify each arch page exists (possibly) in parallel
 		for _, a := range architectures {
 			go func(arch string) {
 				defer wg.Done()
@@ -217,6 +219,7 @@ func ArchMage(client *http.Client, repo *HTTPRepoConfig) error {
 				finalUrl := repo.URL + arch + "/"
 				exists, err := updates.CheckWebPageExists(client, finalUrl)
 				if err != nil {
+					// TODO: verify if we need to actually return an error
 					log.Printf("Got error calling HEAD %s: %v...\n", finalUrl, err)
 				}
 				if exists {
@@ -244,32 +247,50 @@ func GetRepo(client *http.Client, mu string) (httpFormattedRepos []HTTPRepoConfi
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving products for MU %s: %v", mu, err)
 	}
-	reposChan := make(chan []HTTPRepoConfig)
 
+	reposChan := make(chan []HTTPRepoConfig)
+	errChan := make(chan error)
+	// empty struct for 0 allocation: we need only to signal we're done, not pass data
+	doneChan := make(chan struct{})
+
+	// we need a dedicated goroutine to start the others, wait for them to finish
+	// and signal back that we're done processing
 	go func() {
 		var wg sync.WaitGroup
 		wg.Add(len(productsChunks))
 
+		// process each chunk (possibly) in parallel
 		for _, productChunk := range productsChunks {
 			go func(product, maint string) {
+				defer wg.Done()
+
 				repo, err := ProcWebChunk(client, product, maint)
 				if err != nil {
-					log.Fatalf("Error: %v\n", err)
+					errChan <- err
 				}
-
 				reposChan <- repo
-				wg.Done()
+
 			}(productChunk, mu)
 		}
 
 		wg.Wait()
 		close(reposChan)
+		doneChan <- struct{}{}
 	}()
 
-	for repo := range reposChan {
-		httpFormattedRepos = append(httpFormattedRepos, repo...)
+	// keeps looping untill we're done processing all chunks or an error occurs
+	for {
+		select {
+		case repo := <-reposChan:
+			httpFormattedRepos = append(httpFormattedRepos, repo...)
+		case err = <-errChan:
+			return nil, err
+		case <-doneChan:
+			close(errChan)
+			close(doneChan)
+			return httpFormattedRepos, nil
+		}
 	}
-	return httpFormattedRepos, nil
 }
 
 func getProductsForMU(client *http.Client, mu string) ([]string, error) {
@@ -306,6 +327,7 @@ func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updat
 	if err != nil {
 		return updlist, fmt.Errorf("error while getting response from obs: %v", err)
 	}
+
 	for _, value := range rrs {
 		var update Updates
 		update.ReleaseRequest = value.Id
@@ -326,9 +348,9 @@ func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updat
 		if !justsearch {
 			mu := fmt.Sprintf("%s%s/", updates.DownloadIbsLink, update.IncidentNumber)
 			update.Repositories, err = GetRepo(client.HttpClient, mu)
-		}
-		if err != nil {
-			return updlist, fmt.Errorf("something went wrong in repo processing: %v", err)
+			if err != nil {
+				return updlist, fmt.Errorf("something went wrong in repo processing: %v", err)
+			}
 		}
 		updlist = append(updlist, update)
 	}
