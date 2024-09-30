@@ -43,6 +43,11 @@ func (mrt *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func createMockClient(baseUrl string, archs []string) *http.Client {
 	responses := make(map[string]*http.Response, len(archs))
+	responses[baseUrl] = &http.Response{
+		Status:     "200 OK",
+		StatusCode: 200,
+		Body:       io.NopCloser(bytes.NewBufferString("")),
+	}
 
 	for _, arch := range archs {
 		url := fmt.Sprintf("%s%s/", baseUrl, arch)
@@ -59,7 +64,7 @@ func createMockClient(baseUrl string, archs []string) *http.Client {
 }
 
 func TestArchMage(t *testing.T) {
-	baseUrl := "http://download.suse.de/ibs/totallyrandomtestrepo/"
+	baseUrl := "http://download.suse.de/ibs/SUSA:/Maintenance:/11111/SLE-15-SP4_Update/"
 
 	tests := []struct {
 		name       string
@@ -82,16 +87,73 @@ func TestArchMage(t *testing.T) {
 
 			err := ArchMage(mockClient, &repo)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
+			assert.ElementsMatch(t, tt.validArchs, repo.Archs)
+		})
+	}
+}
 
-			for arch := range tt.validArchs {
-				var found bool
-				for repoArch := range repo.Archs {
-					if arch == repoArch {
-						found = true
-						break
-					}
-				}
-				assert.True(t, found)
+func TestProcWebChunk(t *testing.T) {
+	tests := []struct {
+		name       string
+		maint      string
+		product    string
+		validArchs []string
+		want       []HTTPRepoConfig
+		wantErr    bool
+	}{
+		{
+			"Valid maint repo - arch in the url", "http://download.suse.de/ibs/SUSE:/Maintenance:/22222/", "SUSE_SLE-15-SP4_Update/x86_64/",
+			[]string{},
+			[]HTTPRepoConfig{
+				HTTPRepoConfig{
+					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/22222/SUSE_SLE-15-SP4_Update/x86_64/",
+					Archs: []string{"x86_64"},
+				},
+			},
+			false,
+		},
+		{
+			"Valid maint repo - single valid arch", "http://download.suse.de/ibs/SUSE:/Maintenance:/33333/", "SUSE_SLE-15-SP4_Update/",
+			[]string{"aarch64"},
+			[]HTTPRepoConfig{
+				HTTPRepoConfig{
+					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/33333/SUSE_SLE-15-SP4_Update/",
+					Archs: []string{"aarch64"},
+				},
+			},
+			false,
+		},
+		{
+			"Valid maint repo - multiple valid archs", "http://download.suse.de/ibs/SUSE:/Maintenance:/44444/", "SUSE_SLE-15-SP4_Update/",
+			[]string{"x86_64", "aarch64", "ppc64le", "s390x"},
+			[]HTTPRepoConfig{
+				HTTPRepoConfig{
+					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/44444/SUSE_SLE-15-SP4_Update/",
+					Archs: []string{"x86_64", "aarch64", "ppc64le", "s390x"},
+				},
+			},
+			false,
+		},
+		{
+			"Valid maint repo - no valid archs", "http://download.suse.de/ibs/SUSE:/Maintenance:/55555/", "SUSE_SLE-15-SP4_Update/",
+			[]string{},
+			[]HTTPRepoConfig{},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			url := fmt.Sprintf("%s%s", tt.maint, tt.product)
+			client := createMockClient(url, tt.validArchs)
+
+			got, err := ProcWebChunk(client, tt.product, tt.maint)
+			assert.EqualValues(t, tt.wantErr, (err != nil))
+			assert.Equal(t, len(tt.want), len(got))
+			for i := range tt.want {
+				wantRepo := tt.want[i]
+				gotRepo := got[i]
+				assert.Equal(t, wantRepo.URL, gotRepo.URL)
+				assert.ElementsMatch(t, wantRepo.Archs, gotRepo.Archs)
 			}
 		})
 	}
