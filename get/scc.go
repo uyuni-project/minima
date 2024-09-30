@@ -23,9 +23,14 @@ type SCCReposConfig struct {
 	Archs []string
 }
 
-// HTTPRepoConfig defines the configuration of an HTTP repo
-type HTTPRepoConfig struct {
-	URL   string
+// HTTP defines the configuration to be used for downloading packages from HTTP URLs
+type HTTP struct {
+	Repositories []HTTPReposConfig
+}
+
+// HTTPRepoConfig defines the configuration of HTTP repos sharing the same architectures
+type HTTPReposConfig struct {
+	URLs  []string
 	Archs []string
 }
 
@@ -37,27 +42,50 @@ type Repo struct {
 	DistroTarget string `json:"distro_target"`
 }
 
-// maps a repo name to the available archs for it
-type sccMap map[string][]string
+// maps a repo name to the available JSON entry from SCC API
+type sccMap map[string]Repo
 
-// SCCToHTTPConfigs returns HTTPS repos configurations (URL and archs) for repos in SCC
-func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfigs []SCCReposConfig) ([]HTTPRepoConfig, error) {
-	token := base64.URLEncoding.EncodeToString([]byte(username + ":" + password))
-	httpConfigs := []HTTPRepoConfig{}
+// SCCToHTTPConfigs returns HTTPS repos configurations (URLs and archs) for repos in SCC
+func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfigs []SCCReposConfig) ([]HTTPReposConfig, error) {
+	sccEntries, err := getSCCEntries(baseURL, username, password)
+	if err != nil {
+		return nil, err
+	}
 
-	// build a map of name - available archs entries to avoid repeated iterations
-	// on sccConfigs when searching repos by name and archs
-	sccEntries := make(sccMap)
-	for _, config := range sccConfigs {
-		for _, name := range config.Names {
-			sccEntries[name] = config.Archs
+	httpConfigs := []HTTPReposConfig{}
+	for _, sccConfig := range sccConfigs {
+		httpConfig := HTTPReposConfig{
+			URLs:  []string{},
+			Archs: sccConfig.Archs,
+		}
+
+		for _, name := range sccConfig.Names {
+			repo, ok := sccEntries[name]
+			if ok {
+				for _, arch := range sccConfig.Archs {
+					if strings.Contains(repo.Description, arch) {
+						httpConfig.URLs = append(httpConfig.URLs, repo.URL)
+						break
+					}
+				}
+			}
+		}
+
+		if len(httpConfig.URLs) > 0 {
+			httpConfigs = append(httpConfigs, httpConfig)
 		}
 	}
+	return httpConfigs, nil
+}
+
+// getSCCEntries retrieves data from SCC API about the available repositories for an organizaion
+func getSCCEntries(baseURL string, username, password string) (sccMap, error) {
+	sccEntries := make(sccMap)
+	token := base64.URLEncoding.EncodeToString([]byte(username + ":" + password))
+	next := baseURL + "/connect/organizations/repositories"
 
 	var page []byte
 	var err error
-	next := baseURL + "/connect/organizations/repositories"
-
 	fmt.Println("Repos available in SCC follow:")
 	for {
 		page, next, err = downloadPaged(next, token)
@@ -73,10 +101,7 @@ func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfi
 
 		for _, repo := range repos {
 			fmt.Printf("  %s: %s\n", repo.Name, repo.Description)
-			config, ok := getHTTPConfig(repo.Name, repo.Description, repo.URL, sccEntries)
-			if ok {
-				httpConfigs = append(httpConfigs, config)
-			}
+			sccEntries[repo.Name] = repo
 		}
 
 		if next == "" {
@@ -84,31 +109,7 @@ func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfi
 		}
 	}
 
-	return httpConfigs, nil
-}
-
-// getHTTPConfig attempts to match the given repo name and description to one of the given
-// sccMap entries and build a HTTRepoConfig for it.
-//
-// Returns a HTTPRepoConfig and a bool indicating whether the match was successfull or not.
-func getHTTPConfig(name, description, url string, sccEntries sccMap) (HTTPRepoConfig, bool) {
-	httpConfig := HTTPRepoConfig{
-		Archs: []string{},
-	}
-
-	repoArchs, ok := sccEntries[name]
-	if ok {
-		for _, arch := range repoArchs {
-			if strings.Contains(description, arch) {
-				httpConfig.Archs = append(httpConfig.Archs, arch)
-			}
-		}
-		if len(httpConfig.Archs) > 0 {
-			httpConfig.URL = url
-			return httpConfig, true
-		}
-	}
-	return httpConfig, false
+	return sccEntries, nil
 }
 
 func downloadPaged(url string, token string) (page []byte, next string, err error) {

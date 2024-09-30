@@ -38,8 +38,10 @@ var (
       # bucket: minima-bucket-key
 
     http:
-      - url: http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
-        archs: [x86_64]
+	  repositories:
+        - urls:
+	  	  - http://download.opensuse.org/repositories/myrepo1/openSUSE_Leap_42.3/
+          archs: [x86_64]
 
     # optional section to download repos from SCC
     # scc:
@@ -85,7 +87,7 @@ type Config struct {
 	Storage get.StorageConfig
 	SCC     get.SCC
 	OBS     updates.OBS
-	HTTP    []get.HTTPRepoConfig
+	HTTP    get.HTTP
 }
 
 func syncersFromConfig(configString string) ([]*get.Syncer, error) {
@@ -109,36 +111,38 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 			}
 		}
 
-		httpRepoConfigs, err := get.SCCToHTTPConfigs(sccUrl, config.SCC.Username, config.SCC.Password, config.SCC.Repositories)
+		httpReposConfigs, err := get.SCCToHTTPConfigs(sccUrl, config.SCC.Username, config.SCC.Password, config.SCC.Repositories)
 		if err != nil {
 			return nil, err
 		}
-		config.HTTP = append(config.HTTP, httpRepoConfigs...)
+		config.HTTP.Repositories = append(config.HTTP.Repositories, httpReposConfigs...)
 	}
 
 	syncers := []*get.Syncer{}
-	for _, httpRepo := range config.HTTP {
-		repoURL, err := url.Parse(httpRepo.URL)
-		if err != nil {
-			return nil, err
-		}
-
-		archs := map[string]bool{}
-		for _, archString := range httpRepo.Archs {
-			archs[archString] = true
-		}
-
-		var storage get.Storage
-		switch config.Storage.Type {
-		case "file":
-			storage = get.NewFileStorage(filepath.Join(config.Storage.Path, filepath.FromSlash(repoURL.Path)))
-		case "s3":
-			storage, err = get.NewS3Storage(config.Storage.AccessKeyID, config.Storage.AccessKeyID, config.Storage.Region, config.Storage.Bucket+repoURL.Path)
+	for _, reposConfig := range config.HTTP.Repositories {
+		for _, repoURL := range reposConfig.URLs {
+			parsedURL, err := url.Parse(repoURL)
 			if err != nil {
 				return nil, err
 			}
+
+			archs := map[string]bool{}
+			for _, archString := range reposConfig.Archs {
+				archs[archString] = true
+			}
+
+			var storage get.Storage
+			switch config.Storage.Type {
+			case "file":
+				storage = get.NewFileStorage(filepath.Join(config.Storage.Path, filepath.FromSlash(parsedURL.Path)))
+			case "s3":
+				storage, err = get.NewS3Storage(config.Storage.AccessKeyID, config.Storage.AccessKeyID, config.Storage.Region, config.Storage.Bucket+parsedURL.Path)
+				if err != nil {
+					return nil, err
+				}
+			}
+			syncers = append(syncers, get.NewSyncer(*parsedURL, archs, storage))
 		}
-		syncers = append(syncers, get.NewSyncer(*repoURL, archs, storage))
 	}
 
 	return syncers, nil
