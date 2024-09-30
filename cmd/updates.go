@@ -35,6 +35,14 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+type Updates struct {
+	IncidentNumber string
+	ReleaseRequest string
+	SRCRPMS        []string
+	Products       string
+	Repositories   []HTTPRepoConfig
+}
+
 // package scoped slice of all possible available archs to check for a repo
 var architectures = [...]string{"x86_64", "i586", "i686", "aarch64", "aarch64_ilp32", "ppc64le", "s390x", "src"}
 
@@ -160,33 +168,31 @@ func muFindAndSync() {
 	//time.Sleep(60 * time.Second)
 }
 
-func ProcWebChunk(client *http.Client, val, maint string) (httpFormattedRepos []HTTPRepoConfig, err error) {
+func ProcWebChunk(client *http.Client, product, maint string) ([]HTTPRepoConfig, error) {
+	httpFormattedRepos := []HTTPRepoConfig{}
 	repo := HTTPRepoConfig{
 		Archs: []string{},
 	}
+	repoUrl := maint + product
 
-	if regexp.MustCompile(`^SUSE`).FindString(val) != "" {
-		val = maint + val
+	_, ok := register.Load(repoUrl)
+	if !ok {
+		exists, err := updates.CheckWebPageExists(client, repoUrl)
+		if err != nil {
+			return nil, err
+		}
+		register.Store(repoUrl, exists)
 
-		_, ok := register.Load(val)
-		if !ok {
-			exists, err := updates.CheckWebPageExists(client, val)
-			if err != nil {
+		if exists {
+			repo.URL = repoUrl
+			if err := ArchMage(client, &repo); err != nil {
 				return nil, err
 			}
-			register.Store(val, exists)
-
-			if exists {
-				repo.URL = val
-				if err := ArchMage(client, &repo); err != nil {
-					return nil, err
-				}
-				fmt.Println(repo)
-				httpFormattedRepos = append(httpFormattedRepos, repo)
-			}
+			fmt.Println(repo)
+			httpFormattedRepos = append(httpFormattedRepos, repo)
 		}
 	}
-	return httpFormattedRepos, err
+	return httpFormattedRepos, nil
 }
 
 // ---- This function checks that all architecture slice of a *HTTPRepoConfig is filled right
@@ -233,6 +239,40 @@ func ArchMage(client *http.Client, repo *HTTPRepoConfig) error {
 
 func GetRepo(mu string) (httpFormattedRepos []HTTPRepoConfig, err error) {
 	client := &http.Client{}
+
+	productsChunks, err := getProductsForMU(client, mu)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving products for MU %s: %v", mu, err)
+	}
+	reposChan := make(chan []HTTPRepoConfig)
+
+	go func() {
+		var wg sync.WaitGroup
+		wg.Add(len(productsChunks))
+
+		for _, productChunk := range productsChunks {
+			go func(product, maint string) {
+				repo, err := ProcWebChunk(client, product, maint)
+				if err != nil {
+					log.Fatalf("Error: %v\n", err)
+				}
+
+				reposChan <- repo
+				wg.Done()
+			}(productChunk, mu)
+		}
+
+		wg.Wait()
+		close(reposChan)
+	}()
+
+	for repo := range reposChan {
+		httpFormattedRepos = append(httpFormattedRepos, repo...)
+	}
+	return httpFormattedRepos, nil
+}
+
+func getProductsForMU(client *http.Client, mu string) ([]string, error) {
 	resp, err := client.Get(mu)
 	if err != nil {
 		return nil, err
@@ -242,34 +282,22 @@ func GetRepo(mu string) (httpFormattedRepos []HTTPRepoConfig, err error) {
 	if err != nil {
 		return nil, err
 	}
+	chunks := strings.Split(string(body), "\"")
+	productsChunks := cleanWebChunks(chunks)
 
-	configsChan := make(chan []HTTPRepoConfig)
+	return productsChunks, nil
+}
 
-	go func() {
-		var wg sync.WaitGroup
-		values := strings.Split(string(body), "\"")
-		wg.Add(len(values))
+func cleanWebChunks(chunks []string) []string {
+	products := []string{}
+	regEx := regexp.MustCompile(`^SUSE`)
 
-		for _, val := range values {
-			go func(v, maint string) {
-				cfgs, err := ProcWebChunk(client, v, maint)
-				if err != nil {
-					log.Fatalf("Error: %v\n", err)
-				}
-
-				configsChan <- cfgs
-				wg.Done()
-			}(val, mu)
+	for _, chunk := range chunks {
+		if regEx.FindString(chunk) != "" {
+			products = append(products, chunk)
 		}
-
-		wg.Wait()
-		close(configsChan)
-	}()
-
-	for configs := range configsChan {
-		httpFormattedRepos = append(httpFormattedRepos, configs...)
 	}
-	return httpFormattedRepos, nil
+	return products
 }
 
 func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updates, err error) {
@@ -344,12 +372,4 @@ func MakeAMap(updates []Updates) (updatesMap map[string]bool) {
 		updatesMap[elem.IncidentNumber] = true
 	}
 	return
-}
-
-type Updates struct {
-	IncidentNumber string
-	ReleaseRequest string
-	SRCRPMS        []string
-	Products       string
-	Repositories   []HTTPRepoConfig
 }
