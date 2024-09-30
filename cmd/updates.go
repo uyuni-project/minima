@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -33,6 +34,12 @@ import (
 	"github.com/uyuni-project/minima/updates"
 	yaml "gopkg.in/yaml.v2"
 )
+
+// package scoped slice of all possible available archs to check for a repo
+var architectures = [...]string{"x86_64", "i586", "i686", "aarch64", "aarch64_ilp32", "ppc64le", "s390x", "src"}
+
+// package scoped Thread-safe Map used as cache to check the existence of repositories
+var register sync.Map
 
 // mufnsCmd represents the mufns command
 var (
@@ -98,7 +105,6 @@ func muFindAndSync() {
 			if mu := strings.Split(thisMU, ":"); len(mu) != 4 {
 				log.Fatalf("Badly formatted MU. It must be SUSE:Maintenance:NUMBER:NUMBER")
 			} else {
-
 				a := Updates{}
 				a.IncidentNumber = mu[2]
 				a.ReleaseRequest = mu[3]
@@ -154,57 +160,80 @@ func muFindAndSync() {
 	//time.Sleep(60 * time.Second)
 }
 
-func ProcWebChunk(val, maint string, register map[string]bool) (r map[string]bool, httpFormattedRepos []get.HTTPRepoConfig, err error) {
-	var repo get.HTTPRepoConfig
+func ProcWebChunk(client *http.Client, val, maint string) (httpFormattedRepos []HTTPRepoConfig, err error) {
+	repo := HTTPRepoConfig{
+		Archs: []string{},
+	}
+
 	if regexp.MustCompile(`^SUSE`).FindString(val) != "" {
 		val = maint + val
-		if !register[val] {
-			exists, err := updates.CheckWebPageExists(val)
+
+		_, ok := register.Load(val)
+		if !ok {
+			exists, err := updates.CheckWebPageExists(client, val)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
+			register.Store(val, exists)
+
 			if exists {
-				register[val] = true
 				repo.URL = val
-				repo.Archs = []string{}
-				reppo := make(chan get.HTTPRepoConfig)
-				go func(rep get.HTTPRepoConfig) {
-					rp, _ := ArchMage(rep)
-					reppo <- rp
-				}(repo)
-				rep := <-reppo
-				fmt.Println(rep)
-				httpFormattedRepos = append(httpFormattedRepos, rep)
-			} else {
-				delete(register, val)
+				if err := ArchMage(client, &repo); err != nil {
+					return nil, err
+				}
+				fmt.Println(repo)
+				httpFormattedRepos = append(httpFormattedRepos, repo)
 			}
 		}
 	}
-	r = register
-	return r, httpFormattedRepos, err
+	return httpFormattedRepos, err
 }
 
 // ---- This function checks that all architecture slice of a *HTTPRepoConfig is filled right
-func ArchMage(repo get.HTTPRepoConfig) (get.HTTPRepoConfig, error) {
-	archRegister := []string{"x86_64", "i586", "i686", "aarch64", "aarch64_ilp32", "ppc64le", "s390x", "src"}
-	for _, arch := range archRegister {
-		if strings.Contains(repo.URL, arch) {
-			repo.Archs = append(repo.Archs, arch)
-		} else {
-			exists, err := updates.CheckWebPageExists(repo.URL + arch + "/")
-			if err != nil {
-				return repo, err
-			}
-			if exists {
-				repo.Archs = append(repo.Archs, arch)
-			}
+func ArchMage(client *http.Client, repo *HTTPRepoConfig) error {
+	archsChan := make(chan string)
+
+	go func() {
+		var wg sync.WaitGroup
+		wg.Add(len(architectures))
+
+		for _, a := range architectures {
+			go func(arch string) {
+				defer wg.Done()
+
+				if strings.Contains(repo.URL, arch) {
+					archsChan <- arch
+					return
+				}
+
+				finalUrl := repo.URL + arch + "/"
+				exists, err := updates.CheckWebPageExists(client, finalUrl)
+				if err != nil {
+					log.Printf("Got error calling HEAD %s: %v...\n", finalUrl, err)
+				}
+				if exists {
+					archsChan <- arch
+				}
+			}(a)
 		}
+
+		wg.Wait()
+		close(archsChan)
+	}()
+
+	for foundArch := range archsChan {
+		repo.Archs = append(repo.Archs, foundArch)
 	}
-	return repo, nil
+
+	if len(repo.Archs) == 0 {
+		return fmt.Errorf("no available arch has been found for this repo: %s", repo.URL)
+	}
+	return nil
 }
 
-func GetRepo(mu string) (httpFormattedRepos []get.HTTPRepoConfig, err error) {
-	resp, err := http.Get(mu)
+func GetRepo(mu string) (httpFormattedRepos []HTTPRepoConfig, err error) {
+	client := &http.Client{}
+	resp, err := client.Get(mu)
 	if err != nil {
 		return nil, err
 	}
@@ -213,20 +242,32 @@ func GetRepo(mu string) (httpFormattedRepos []get.HTTPRepoConfig, err error) {
 	if err != nil {
 		return nil, err
 	}
-	repos := make(chan []get.HTTPRepoConfig)
-	rr := make(chan map[string]bool)
-	register := make(map[string]bool)
-	for _, val := range strings.Split(string(body), "\"") {
-		go func(vl, maint string, reg map[string]bool) {
-			reg, slice, err := ProcWebChunk(vl, mu, reg)
-			if err != nil {
-				log.Fatalf("Error: %v\n", err)
-			}
-			repos <- slice
-			rr <- reg
-		}(val, mu, register)
-		httpFormattedRepos = append(httpFormattedRepos, <-repos...)
-		register = <-rr
+
+	configsChan := make(chan []HTTPRepoConfig)
+
+	go func() {
+		var wg sync.WaitGroup
+		values := strings.Split(string(body), "\"")
+		wg.Add(len(values))
+
+		for _, val := range values {
+			go func(v, maint string) {
+				cfgs, err := ProcWebChunk(client, v, maint)
+				if err != nil {
+					log.Fatalf("Error: %v\n", err)
+				}
+
+				configsChan <- cfgs
+				wg.Done()
+			}(val, mu)
+		}
+
+		wg.Wait()
+		close(configsChan)
+	}()
+
+	for configs := range configsChan {
+		httpFormattedRepos = append(httpFormattedRepos, configs...)
 	}
 	return httpFormattedRepos, nil
 }
@@ -255,7 +296,8 @@ func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updat
 			}
 		}
 		if !justsearch {
-			update.Repositories, err = GetRepo(fmt.Sprintf("%s%s/", updates.DownloadIbsLink, update.IncidentNumber))
+			mu := fmt.Sprintf("%s%s/", updates.DownloadIbsLink, update.IncidentNumber)
+			update.Repositories, err = GetRepo(mu)
 		}
 		if err != nil {
 			return updlist, fmt.Errorf("something went wrong in repo processing: %v", err)
@@ -309,5 +351,5 @@ type Updates struct {
 	ReleaseRequest string
 	SRCRPMS        []string
 	Products       string
-	Repositories   []get.HTTPRepoConfig
+	Repositories   []HTTPRepoConfig
 }
