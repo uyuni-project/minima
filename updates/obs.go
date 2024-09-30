@@ -67,7 +67,7 @@ func (c *Client) GetPatchinfo(rr ReleaseRequest) (*Patchinfo, error) {
 }
 
 func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func NewClient(username string, password string) *Client {
 		BaseURL:    &url.URL{Host: baseUrl, Scheme: "https"},
 		Username:   username,
 		Password:   password,
-		httpClient: &http.Client{},
+		HttpClient: &http.Client{},
 	}
 }
 

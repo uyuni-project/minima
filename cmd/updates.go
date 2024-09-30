@@ -18,8 +18,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
-
 	"log"
 	"net/http"
 	"os"
@@ -43,7 +41,7 @@ type Updates struct {
 	Repositories   []HTTPRepoConfig
 }
 
-// package scoped slice of all possible available archs to check for a repo
+// package scoped array of all possible available archs to check for a repo
 var architectures = [...]string{"x86_64", "i586", "i686", "aarch64", "aarch64_ilp32", "ppc64le", "s390x", "src"}
 
 // package scoped Thread-safe Map used as cache to check the existence of repositories
@@ -83,10 +81,12 @@ func init() {
 func muFindAndSync() {
 	config := Config{}
 	updateList := []Updates{}
+
 	err := yaml.Unmarshal([]byte(cfgString), &config)
 	if err != nil {
 		log.Fatalf("There is an error: %v", err)
 	}
+
 	if cleanup {
 		// DO CLEANUP - TO BE IMPLEMENTED
 		log.Println("searching for outdated MU repos...")
@@ -117,23 +117,26 @@ func muFindAndSync() {
 				a.IncidentNumber = mu[2]
 				a.ReleaseRequest = mu[3]
 				mu := fmt.Sprintf("%s%s/", updates.DownloadIbsLink, a.IncidentNumber)
-				a.Repositories, err = GetRepo(mu)
-				config.HTTP = append(config.HTTP, a.Repositories...)
+
+				a.Repositories, err = GetRepo(http.DefaultClient, mu)
 				if err != nil {
 					log.Fatalf("Something went wrong in Repo processing: %v\n", err)
 				}
+				config.HTTP = append(config.HTTP, a.Repositories...)
 				updateList = append(updateList, a)
 			}
 		}
+
 		var errorflag bool = false
 		byteChunk, err := yaml.Marshal(config)
 		if err != nil {
 			log.Fatalf("There is an error: %v", err)
 		}
+
 		if spitYamls {
 			//log.Printf("This is going to be added to config.HTTP: %v", config.HTTP)
 			t := time.Now()
-			err := ioutil.WriteFile(fmt.Sprintf("./minima_obs_%v-%v-%v-%v:%v.yaml", t.Year(), t.Month(), t.Local().Day(), t.Hour(), t.Minute()), byteChunk, 0644)
+			err := os.WriteFile(fmt.Sprintf("./minima_obs_%v-%v-%v-%v:%v.yaml", t.Year(), t.Month(), t.Local().Day(), t.Hour(), t.Minute()), byteChunk, 0644)
 			if err != nil {
 				log.Fatalf("There is an error: %v", err)
 			}
@@ -148,7 +151,6 @@ func muFindAndSync() {
 		syncers, err := syncersFromConfig(string(byteChunk))
 		if err != nil {
 			log.Fatal(err)
-			errorflag = true
 		}
 		for _, syncer := range syncers {
 			log.Printf("Processing repo: %s", syncer.URL.String())
@@ -237,9 +239,7 @@ func ArchMage(client *http.Client, repo *HTTPRepoConfig) error {
 	return nil
 }
 
-func GetRepo(mu string) (httpFormattedRepos []HTTPRepoConfig, err error) {
-	client := &http.Client{}
-
+func GetRepo(client *http.Client, mu string) (httpFormattedRepos []HTTPRepoConfig, err error) {
 	productsChunks, err := getProductsForMU(client, mu)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving products for MU %s: %v", mu, err)
@@ -325,7 +325,7 @@ func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updat
 		}
 		if !justsearch {
 			mu := fmt.Sprintf("%s%s/", updates.DownloadIbsLink, update.IncidentNumber)
-			update.Repositories, err = GetRepo(mu)
+			update.Repositories, err = GetRepo(client.HttpClient, mu)
 		}
 		if err != nil {
 			return updlist, fmt.Errorf("something went wrong in repo processing: %v", err)

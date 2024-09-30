@@ -7,16 +7,14 @@ import (
 
 const (
 	DownloadIbsLink = "http://download.suse.de/ibs/SUSE:/Maintenance:/"
-	baseUrl = "api.suse.de"
+	baseUrl         = "api.suse.de"
 )
-
-
 
 type Client struct {
 	BaseURL    *url.URL
 	Username   string
 	Password   string
-	httpClient *http.Client
+	HttpClient *http.Client
 }
 
 type Person struct {
