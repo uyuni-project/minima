@@ -4,7 +4,6 @@ package updates
 import (
 	"bytes"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -68,12 +67,12 @@ func (c *Client) GetPatchinfo(rr ReleaseRequest) (*Patchinfo, error) {
 }
 
 func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.HttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, errors.New(fmt.Sprintf("Got status code: %v for %q\n", resp.StatusCode, req.URL))
+		return nil, fmt.Errorf("got status code: %v for %q", resp.StatusCode, req.URL)
 	}
 	defer resp.Body.Close()
 	err = xml.NewDecoder(resp.Body).Decode(v)
@@ -85,18 +84,15 @@ func NewClient(username string, password string) *Client {
 		BaseURL:    &url.URL{Host: baseUrl, Scheme: "https"},
 		Username:   username,
 		Password:   password,
-		httpClient: &http.Client{},
+		HttpClient: &http.Client{},
 	}
 }
 
-func CheckWebPageExists(repoURL string) (bool, error) {
-	client := &http.Client{}
+func CheckWebPageExists(client *http.Client, repoURL string) (bool, error) {
 	resp, err := client.Head(repoURL)
 	if err != nil {
 		return false, err
 	}
-	if resp.Status == "200 OK" {
-		return true, nil
-	}
-	return false, nil
+
+	return resp.Status == "200 OK", nil
 }
