@@ -84,7 +84,7 @@ func muFindAndSync() {
 
 	err := yaml.Unmarshal([]byte(cfgString), &config)
 	if err != nil {
-		log.Fatalf("There is an error: %v", err)
+		log.Fatalf("Error reading configuration: %v", err)
 	}
 
 	if cleanup {
@@ -92,18 +92,18 @@ func muFindAndSync() {
 		log.Println("searching for outdated MU repos...")
 		updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, true)
 		if err != nil {
-			log.Fatalf("There is an error: %v", err)
+			log.Fatalf("Error searching for outdated MUs repos: %v", err)
 		}
 		err = RemoveOldChannels(config, updateList)
 		if err != nil {
-			log.Fatalf("There is an error: %v", err)
+			log.Fatalf("Error removing old channels: %v", err)
 		}
 		log.Println("...done!")
 	} else {
 		if thisMU == "" {
 			updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, justSearch)
 			if err != nil {
-				log.Fatalf("There is an error: %v", err)
+				log.Fatalf("Error finding updates and channels: %v", err)
 			}
 			config.HTTP = []get.HTTPRepoConfig{}
 			for _, val := range updateList {
@@ -127,18 +127,16 @@ func muFindAndSync() {
 			}
 		}
 
-		var errorflag bool = false
 		byteChunk, err := yaml.Marshal(config)
 		if err != nil {
-			log.Fatalf("There is an error: %v", err)
+			log.Fatalf("Error marshalling config: %v", err)
 		}
 
 		if spitYamls {
-			//log.Printf("This is going to be added to config.HTTP: %v", config.HTTP)
 			t := time.Now()
 			err := os.WriteFile(fmt.Sprintf("./minima_obs_%v-%v-%v-%v:%v.yaml", t.Year(), t.Month(), t.Local().Day(), t.Hour(), t.Minute()), byteChunk, 0644)
 			if err != nil {
-				log.Fatalf("There is an error: %v", err)
+				log.Fatalf("Error writing file: %v", err)
 			}
 			os.Exit(3)
 		}
@@ -148,28 +146,24 @@ func muFindAndSync() {
 			}
 			os.Exit(3)
 		}
+
 		syncers, err := syncersFromConfig(string(byteChunk))
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		for _, syncer := range syncers {
 			log.Printf("Processing repo: %s", syncer.URL.String())
 			err := syncer.StoreRepo()
 			if err != nil {
-				log.Println(err)
-				errorflag = true
-			} else {
-				log.Println("...done.")
+				log.Fatal(err)
 			}
-		}
-		if errorflag {
-			os.Exit(1)
+			log.Println("...done.")
 		}
 	}
-	//fmt.Printf("USERNAME: %s\nPASSWORD: %s\n", config.OBS.Username, config.OBS.Password)
-	//time.Sleep(60 * time.Second)
 }
 
+// ProcWebChunk retrieves repositories data for a product target in a MU
 func ProcWebChunk(client *http.Client, product, maint string) ([]get.HTTPRepoConfig, error) {
 	httpFormattedRepos := []get.HTTPRepoConfig{}
 	repo := get.HTTPRepoConfig{
@@ -197,7 +191,7 @@ func ProcWebChunk(client *http.Client, product, maint string) ([]get.HTTPRepoCon
 	return httpFormattedRepos, nil
 }
 
-// ---- This function checks that all architecture slice of a *HTTPRepoConfig is filled right
+// ArchMage checks that all architecture slice of a *HTTPRepoConfig is filled right
 func ArchMage(client *http.Client, repo *get.HTTPRepoConfig) error {
 	archsChan := make(chan string)
 	// we need a dedicated goroutine to start the others, wait for them to finish
@@ -242,6 +236,7 @@ func ArchMage(client *http.Client, repo *get.HTTPRepoConfig) error {
 	return nil
 }
 
+// GetRepo retrieves HTTP repositories data for all the products targets associated to an MU
 func GetRepo(client *http.Client, mu string) (httpFormattedRepos []get.HTTPRepoConfig, err error) {
 	productsChunks, err := getProductsForMU(client, mu)
 	if err != nil {
@@ -294,6 +289,7 @@ func GetRepo(client *http.Client, mu string) (httpFormattedRepos []get.HTTPRepoC
 	}
 }
 
+// getProductsForMU parses a MU webpage attempting to retrieve a slice of available SUSE products
 func getProductsForMU(client *http.Client, mu string) ([]string, error) {
 	fmt.Println("GET", mu)
 	resp, err := client.Get(mu)
@@ -312,6 +308,7 @@ func getProductsForMU(client *http.Client, mu string) ([]string, error) {
 	return productsChunks, nil
 }
 
+// cleanWebChunks filters a slice of HTML elements and returns a slice containing only SUSE products
 func cleanWebChunks(chunks []string) []string {
 	products := []string{}
 	regEx := regexp.MustCompile(`>(SUSE[^<]+\/)<`)
