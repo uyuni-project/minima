@@ -77,7 +77,7 @@ var (
 	}
 	thisRepo           string
 	archs              string
-	syncLegacyPackages bool
+	skipLegacyPackages bool
 )
 
 // Config maps the configuration in minima.yaml
@@ -93,8 +93,8 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 	if err != nil {
 		return nil, err
 	}
-	//---passing the flag value to a global variable in get package, to trigger syncing of i586 rpms inside x86_64
-	get.Legacy = syncLegacyPackages
+	//---passing the flag value to a global variable in get package, to disables syncing of i586 and i686 rpms (usually inside x86_64)
+	get.SkipLegacy = skipLegacyPackages
 
 	if config.SCC.Username != "" {
 		if thisRepo != "" {
@@ -123,11 +123,6 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 			return nil, err
 		}
 
-		archs := map[string]bool{}
-		for _, archString := range httpRepo.Archs {
-			archs[archString] = true
-		}
-
 		var storage get.Storage
 		switch config.Storage.Type {
 		case "file":
@@ -138,7 +133,7 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 				return nil, err
 			}
 		}
-		syncers = append(syncers, get.NewSyncer(*repoURL, archs, storage))
+		syncers = append(syncers, get.NewSyncer(*repoURL, storage))
 	}
 
 	return syncers, nil
@@ -162,5 +157,5 @@ func init() {
 	// local flags
 	syncCmd.Flags().StringVarP(&thisRepo, "repository", "r", "", "flag that can specifies a single repo (example: SLES11-SP4-Updates)")
 	syncCmd.Flags().StringVarP(&archs, "arch", "a", "", "flag that specifies covered archs in the given repo")
-	syncCmd.Flags().BoolVarP(&syncLegacyPackages, "legacypackages", "l", false, "flag that triggers mirroring of i586 pkgs in x86_64 repos")
+	syncCmd.Flags().BoolVarP(&skipLegacyPackages, "nolegacy", "l", false, "flag that disables mirroring of i586 and i686 pkgs")
 }
