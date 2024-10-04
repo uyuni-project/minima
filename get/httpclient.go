@@ -6,6 +6,12 @@ import (
 	"net/http"
 )
 
+// HTTPRepoConfig defines the configuration of an HTTP repo
+type HTTPRepoConfig struct {
+	URL   string
+	Archs []string
+}
+
 // UnexpectedStatusCodeError signals a successful request that resulted in an unexpected status code
 type UnexpectedStatusCodeError struct {
 	URL        string
@@ -31,4 +37,13 @@ func ReadURL(url string) (r io.ReadCloser, err error) {
 	r = response.Body
 
 	return
+}
+
+func CheckWebPageExists(client *http.Client, repoURL string) (bool, error) {
+	resp, err := client.Head(repoURL)
+	if err != nil {
+		return false, err
+	}
+
+	return resp.Status == "200 OK", nil
 }

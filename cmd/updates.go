@@ -29,7 +29,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/uyuni-project/minima/get"
-	"github.com/uyuni-project/minima/updates"
+	"github.com/uyuni-project/minima/maint"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -90,7 +90,7 @@ func muFindAndSync() {
 	if cleanup {
 		// DO CLEANUP - TO BE IMPLEMENTED
 		log.Println("searching for outdated MU repos...")
-		updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, true)
+		updateList, err = GetUpdatesAndChannels(config.BuildService.Username, config.BuildService.Password, true)
 		if err != nil {
 			log.Fatalf("Error searching for outdated MUs repos: %v", err)
 		}
@@ -101,7 +101,7 @@ func muFindAndSync() {
 		log.Println("...done!")
 	} else {
 		if thisMU == "" {
-			updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, justSearch)
+			updateList, err = GetUpdatesAndChannels(config.BuildService.Username, config.BuildService.Password, justSearch)
 			if err != nil {
 				log.Fatalf("Error finding updates and channels: %v", err)
 			}
@@ -116,7 +116,7 @@ func muFindAndSync() {
 				a := Updates{}
 				a.IncidentNumber = mu[2]
 				a.ReleaseRequest = mu[3]
-				mu := fmt.Sprintf("%s%s/", updates.DownloadIbsLink, a.IncidentNumber)
+				mu := fmt.Sprintf("%s%s/", maint.DownloadIbsLink, a.IncidentNumber)
 
 				a.Repositories, err = GetRepo(http.DefaultClient, mu)
 				if err != nil {
@@ -173,7 +173,7 @@ func ProcWebChunk(client *http.Client, product, maint string) ([]get.HTTPRepoCon
 
 	_, ok := register.Load(repoUrl)
 	if !ok {
-		exists, err := updates.CheckWebPageExists(client, repoUrl)
+		exists, err := get.CheckWebPageExists(client, repoUrl)
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +211,7 @@ func ArchMage(client *http.Client, repo *get.HTTPRepoConfig) error {
 				}
 
 				finalUrl := repo.URL + arch + "/"
-				exists, err := updates.CheckWebPageExists(client, finalUrl)
+				exists, err := get.CheckWebPageExists(client, finalUrl)
 				if err != nil {
 					// TODO: verify if we need to actually return an error
 					log.Printf("Got error calling HEAD %s: %v...\n", finalUrl, err)
@@ -323,7 +323,7 @@ func cleanWebChunks(chunks []string) []string {
 }
 
 func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updates, err error) {
-	client := updates.NewClient(usr, passwd)
+	client := maint.NewClient(usr, passwd)
 	rrs, err := client.GetReleaseRequests("qam-manager", "new,review")
 	if err != nil {
 		return updlist, fmt.Errorf("error while getting response from obs: %v", err)
@@ -347,7 +347,7 @@ func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updat
 			}
 		}
 		if !justsearch {
-			mu := fmt.Sprintf("%s%s/", updates.DownloadIbsLink, update.IncidentNumber)
+			mu := fmt.Sprintf("%s%s/", maint.DownloadIbsLink, update.IncidentNumber)
 			update.Repositories, err = GetRepo(client.HttpClient, mu)
 			if err != nil {
 				return updlist, fmt.Errorf("something went wrong in repo processing: %v", err)

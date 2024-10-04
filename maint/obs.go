@@ -1,5 +1,5 @@
 // Lib's Co-Author: Felix Gerling, fgerling@suse.com, https://github.com/fgerling
-package updates
+package maint
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"net/url"
 )
 
-type OBS struct {
+type BuildServiceCredentials struct {
 	Username string
 	Password string
 }
@@ -86,13 +86,4 @@ func NewClient(username string, password string) *Client {
 		Password:   password,
 		HttpClient: &http.Client{},
 	}
-}
-
-func CheckWebPageExists(client *http.Client, repoURL string) (bool, error) {
-	resp, err := client.Head(repoURL)
-	if err != nil {
-		return false, err
-	}
-
-	return resp.Status == "200 OK", nil
 }

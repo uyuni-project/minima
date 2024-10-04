@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/uyuni-project/minima/get"
+	"github.com/uyuni-project/minima/scc"
 	"github.com/uyuni-project/minima/storage"
 )
 
@@ -51,10 +52,10 @@ func TestParseConfig(t *testing.T) {
 					Type: "file",
 					Path: "/srv/mirror",
 				},
-				SCC: get.SCC{
+				SCC: scc.SCC{
 					Username: "user",
 					Password: "pass",
-					Repositories: []get.SCCReposConfig{
+					Repositories: []scc.SCCRepos{
 						{
 							Names: []string{"SLE-Manager-Tools15-Pool", "SLE-Manager-Tools15-Updates"},
 							Archs: []string{"x86_64", "aarch64", "s390x"},
