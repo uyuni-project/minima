@@ -14,7 +14,7 @@ import (
 func TestSyncersFromHTTPRepo(t *testing.T) {
 	tests := []struct {
 		name          string
-		httpRepos     []HTTPRepoConfig
+		httpRepos     []HTTPRepo
 		storageConfig storage.StorageConfig
 		want          []*Syncer
 		wantErr       bool

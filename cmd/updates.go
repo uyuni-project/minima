@@ -38,7 +38,7 @@ type Updates struct {
 	ReleaseRequest string
 	SRCRPMS        []string
 	Products       string
-	Repositories   []get.HTTPRepoConfig
+	Repositories   []get.HTTPRepo
 }
 
 // package scoped array of all possible available archs to check for a repo
@@ -105,7 +105,7 @@ func muFindAndSync() {
 			if err != nil {
 				log.Fatalf("Error finding updates and channels: %v", err)
 			}
-			config.HTTP = []get.HTTPRepoConfig{}
+			config.HTTP = []get.HTTPRepo{}
 			for _, val := range updateList {
 				config.HTTP = append(config.HTTP, val.Repositories...)
 			}
@@ -164,9 +164,9 @@ func muFindAndSync() {
 }
 
 // ProcWebChunk retrieves repositories data for a product target in a MU
-func ProcWebChunk(client *http.Client, product, maint string) ([]get.HTTPRepoConfig, error) {
-	httpFormattedRepos := []get.HTTPRepoConfig{}
-	repo := get.HTTPRepoConfig{
+func ProcWebChunk(client *http.Client, product, maint string) ([]get.HTTPRepo, error) {
+	httpFormattedRepos := []get.HTTPRepo{}
+	repo := get.HTTPRepo{
 		Archs: []string{},
 	}
 	repoUrl := maint + product
@@ -191,8 +191,8 @@ func ProcWebChunk(client *http.Client, product, maint string) ([]get.HTTPRepoCon
 	return httpFormattedRepos, nil
 }
 
-// ArchMage checks that all architecture slice of a *HTTPRepoConfig is filled right
-func ArchMage(client *http.Client, repo *get.HTTPRepoConfig) error {
+// ArchMage checks that all architecture slice of a *HTTPRepo is filled right
+func ArchMage(client *http.Client, repo *get.HTTPRepo) error {
 	archsChan := make(chan string)
 	// we need a dedicated goroutine to start the others, wait for them to finish
 	// and signal back that we're done doing HTTP calls
@@ -237,14 +237,14 @@ func ArchMage(client *http.Client, repo *get.HTTPRepoConfig) error {
 }
 
 // GetRepo retrieves HTTP repositories data for all the products targets associated to an MU
-func GetRepo(client *http.Client, mu string) (httpFormattedRepos []get.HTTPRepoConfig, err error) {
+func GetRepo(client *http.Client, mu string) (httpFormattedRepos []get.HTTPRepo, err error) {
 	productsChunks, err := getProductsForMU(client, mu)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving products for MU %s: %v", mu, err)
 	}
 	fmt.Printf("%d product entries for mu %s\n", len(productsChunks), mu)
 
-	reposChan := make(chan []get.HTTPRepoConfig)
+	reposChan := make(chan []get.HTTPRepo)
 	errChan := make(chan error)
 	// empty struct for 0 allocation: we need only to signal we're done, not pass data
 	doneChan := make(chan struct{})

@@ -39,7 +39,7 @@ type sccMap map[string][]string
 // SCCToHTTPConfigs returns HTTPS repos configurations (URL and archs) for repos in SCC
 func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfigs []SCCRepos) ([]get.HTTPRepo, error) {
 	token := base64.URLEncoding.EncodeToString([]byte(username + ":" + password))
-	httpConfigs := []get.HTTPRepoConfig{}
+	httpConfigs := []get.HTTPRepo{}
 
 	// build a map of name - available archs entries to avoid repeated iterations
 	// on sccConfigs when searching repos by name and archs
@@ -86,9 +86,9 @@ func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfi
 // getHTTPConfig attempts to match the given repo name and description to one of the given
 // sccMap entries and build a HTTRepoConfig for it.
 //
-// Returns a HTTPRepoConfig and a bool indicating whether the match was successfull or not.
-func getHTTPConfig(name, description, url string, sccEntries sccMap) (get.HTTPRepoConfig, bool) {
-	httpConfig := get.HTTPRepoConfig{
+// Returns a HTTPRepo and a bool indicating whether the match was successfull or not.
+func getHTTPConfig(name, description, url string, sccEntries sccMap) (get.HTTPRepo, bool) {
+	httpConfig := get.HTTPRepo{
 		Archs: []string{},
 	}
 

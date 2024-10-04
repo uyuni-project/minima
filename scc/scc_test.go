@@ -46,19 +46,19 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 		pass    string
 		names   []string
 		archs   []string
-		want    []get.HTTPRepoConfig
+		want    []get.HTTPRepo
 		wantErr bool
 	}{
 		{
 			"One name and no matching arch", "user", "pass",
 			[]string{"SLES15-SP5-Pool"}, []string{"s390x"},
-			[]get.HTTPRepoConfig{},
+			[]get.HTTPRepo{},
 			false,
 		},
 		{
 			"One name and one matching arch", "user", "pass",
 			[]string{"SLES15-SP5-Pool"}, []string{"x86_64"},
-			[]get.HTTPRepoConfig{
+			[]get.HTTPRepo{
 				{URL: "http://whatever/SLES15-SP5-Pool", Archs: []string{"x86_64"}},
 			},
 			false,
@@ -66,7 +66,7 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 		{
 			"One name and multiple matching archs", "user", "pass",
 			[]string{"SLES15-SP5-Pool"}, []string{"aarch64", "i586"},
-			[]get.HTTPRepoConfig{
+			[]get.HTTPRepo{
 				{URL: "http://whatever/SLES15-SP5-Pool", Archs: []string{"aarch64", "i586"}},
 			},
 			false,
@@ -74,13 +74,13 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 		{
 			"Multiple names and no matching archs", "user", "pass",
 			[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"src"},
-			[]get.HTTPRepoConfig{},
+			[]get.HTTPRepo{},
 			false,
 		},
 		{
 			"Multiple names and multiple matching archs", "user", "pass",
 			[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"x86_64", "aarch64"},
-			[]get.HTTPRepoConfig{
+			[]get.HTTPRepo{
 				{URL: "http://whatever/SLES15-SP5-Pool", Archs: []string{"x86_64", "aarch64"}},
 				{URL: "http://whatever/SLES15-SP5-Updates", Archs: []string{"x86_64", "aarch64"}},
 			},
@@ -89,13 +89,13 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 		{
 			"Invalid user", "thiswillfail", "pass",
 			[]string{"SLES15-SP5-Pool"}, []string{"x86_64"},
-			[]get.HTTPRepoConfig{},
+			[]get.HTTPRepo{},
 			true,
 		},
 		{
 			"Invalid password", "user", "thiswillfail",
 			[]string{"SLES15-SP5-Pool"}, []string{"x86_64"},
-			[]get.HTTPRepoConfig{},
+			[]get.HTTPRepo{},
 			true,
 		},
 	}

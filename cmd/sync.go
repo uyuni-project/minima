@@ -85,7 +85,7 @@ type Config struct {
 	Storage      storage.StorageConfig
 	SCC          scc.SCC
 	BuildService maint.BuildServiceCredentials
-	HTTP         []get.HTTPRepoConfig
+	HTTP         []get.HTTPRepo
 }
 
 func syncersFromConfig(configString string) ([]*get.Syncer, error) {

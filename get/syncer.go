@@ -129,7 +129,7 @@ func NewSyncer(url url.URL, storage storage.Storage) *Syncer {
 	return &Syncer{url, storage}
 }
 
-func SyncersFromHTTPRepos(repoConfigs []HTTPRepoConfig, storageConfig storage.StorageConfig) ([]*Syncer, error) {
+func SyncersFromHTTPRepos(repoConfigs []HTTPRepo, storageConfig storage.StorageConfig) ([]*Syncer, error) {
 	syncers := []*Syncer{}
 
 	for _, httpRepo := range repoConfigs {

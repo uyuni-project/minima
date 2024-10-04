@@ -104,7 +104,7 @@ func TestArchMage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := get.HTTPRepoConfig{
+			repo := get.HTTPRepo{
 				URL:   maint + sle15sp4Entry + tt.urlArch,
 				Archs: []string{},
 			}
@@ -123,14 +123,14 @@ func TestProcWebChunk(t *testing.T) {
 		maint      string
 		product    string
 		validArchs []string
-		want       []get.HTTPRepoConfig
+		want       []get.HTTPRepo
 		netWorkErr bool
 		wantErr    bool
 	}{
 		{
 			"Valid maint repo - single valid arch", "http://download.suse.de/ibs/SUSE:/Maintenance:/2/", "SUSE_SLE-15-SP4_Update/",
 			[]string{"aarch64"},
-			[]get.HTTPRepoConfig{
+			[]get.HTTPRepo{
 				{
 					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/2/SUSE_SLE-15-SP4_Update/",
 					Archs: []string{"aarch64"},
@@ -142,7 +142,7 @@ func TestProcWebChunk(t *testing.T) {
 		{
 			"Valid maint repo - multiple valid archs", "http://download.suse.de/ibs/SUSE:/Maintenance:/3/", "SUSE_SLE-15-SP4_Update/",
 			[]string{"x86_64", "aarch64", "ppc64le", "s390x"},
-			[]get.HTTPRepoConfig{
+			[]get.HTTPRepo{
 				{
 					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/3/SUSE_SLE-15-SP4_Update/",
 					Archs: []string{"x86_64", "aarch64", "ppc64le", "s390x"},
@@ -154,14 +154,14 @@ func TestProcWebChunk(t *testing.T) {
 		{
 			"Valid maint repo - no valid archs", "http://download.suse.de/ibs/SUSE:/Maintenance:/4/", "SUSE_SLE-15-SP4_Update/",
 			[]string{},
-			[]get.HTTPRepoConfig{},
+			[]get.HTTPRepo{},
 			false,
 			true,
 		},
 		{
 			"Network error", "http://download.suse.de/ibs/SUSE:/Maintenance:/5/", "SUSE_SLE-15-SP4_Update/",
 			[]string{},
-			[]get.HTTPRepoConfig{},
+			[]get.HTTPRepo{},
 			true,
 			true,
 		},
@@ -219,14 +219,14 @@ func TestGetRepo(t *testing.T) {
 		name       string
 		mu         string
 		validArchs []string
-		want       []get.HTTPRepoConfig
+		want       []get.HTTPRepo
 		netWorkErr bool
 		wantErr    bool
 	}{
 		{
 			"Single arch", "http://download.suse.de/ibs/SUSE:/Maintenance:/8/",
 			[]string{"x86_64"},
-			[]get.HTTPRepoConfig{
+			[]get.HTTPRepo{
 				{
 					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/8/SUSE_SLE-15-SP4_Update/",
 					Archs: []string{"x86_64"},
@@ -242,7 +242,7 @@ func TestGetRepo(t *testing.T) {
 		{
 			"Multiple archs", "http://download.suse.de/ibs/SUSE:/Maintenance:/9/",
 			[]string{"x86_64", "aarch64", "ppc64le", "s390x"},
-			[]get.HTTPRepoConfig{
+			[]get.HTTPRepo{
 				{
 					URL:   "http://download.suse.de/ibs/SUSE:/Maintenance:/9/SUSE_SLE-15-SP4_Update/",
 					Archs: []string{"x86_64", "aarch64", "ppc64le", "s390x"},
@@ -258,14 +258,14 @@ func TestGetRepo(t *testing.T) {
 		{
 			"No available archs", "http://download.suse.de/ibs/SUSE:/Maintenance:/10/",
 			[]string{},
-			[]get.HTTPRepoConfig{},
+			[]get.HTTPRepo{},
 			false,
 			true,
 		},
 		{
 			"Network error", "http://download.suse.de/ibs/SUSE:/Maintenance:/11/",
 			[]string{},
-			[]get.HTTPRepoConfig{},
+			[]get.HTTPRepo{},
 			true,
 			true,
 		},
