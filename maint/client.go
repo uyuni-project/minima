@@ -133,8 +133,8 @@ func (c *BuildServiceClient) GetPatchinfo(rr ReleaseRequest) (*Patchinfo, error)
 	return &patchinfo, err
 }
 
-func (c *BuildServiceClient) GetUpdatesAndChannels(justsearch bool) ([]Updates, error) {
-	rrs, err := c.GetReleaseRequests("qam-manager", "new,review")
+func (c *BuildServiceClient) GetUpdatesAndChannels(group, states string, justsearch bool) ([]Updates, error) {
+	rrs, err := c.GetReleaseRequests(group, states)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting response from obs: %v", err)
 	}
@@ -177,7 +177,12 @@ func (c *BuildServiceClient) RemoveOldChannels(config storage.StorageConfig, upd
 	case "file":
 		var muChannelList []string
 
-		err := filepath.Walk(filepath.Join(config.Path, "ibs/SUSE:/Maintenance:/"), func(path string, info os.FileInfo, err error) error {
+		downloadURL, err := url.Parse(c.downloadLink)
+		if err != nil {
+			return err
+		}
+
+		err = filepath.Walk(filepath.Join(config.Path, downloadURL.Path[1:]), func(path string, info os.FileInfo, err error) error {
 			if info.IsDir() {
 				muChannelList = append(muChannelList, path)
 			}

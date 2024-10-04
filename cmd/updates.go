@@ -46,6 +46,8 @@ var (
 	justSearch bool
 	thisMU     string
 	cleanup    bool
+	group      string
+	states     string
 )
 
 func init() {
@@ -55,6 +57,8 @@ func init() {
 	updateCmd.Flags().BoolVarP(&justSearch, "search", "s", false, "flag that would trigger only looking for updates on the Build Service")
 	updateCmd.Flags().StringVarP(&thisMU, "maintupdate", "m", "", "flag that consumes the name of an MU, like 'SUSE:Maintenance:Incident:ReleaseRequest'")
 	updateCmd.Flags().BoolVarP(&cleanup, "cleanup", "k", false, "flag that triggers cleaning up the storage (from old MU channels)")
+	updateCmd.Flags().StringVarP(&group, "group", "g", "", "flag that applies a filter by group")
+	updateCmd.Flags().StringVarP(&states, "states", "t", "new,review", "flag that applies a filter by state, multiple states must be separated by a comma (default 'new,review')")
 }
 
 func muFindAndSync() {
@@ -73,7 +77,7 @@ func muFindAndSync() {
 	if cleanup {
 		// DO CLEANUP - TO BE IMPLEMENTED
 		log.Println("searching for outdated MU repos...")
-		updateList, err := client.GetUpdatesAndChannels(true)
+		updateList, err := client.GetUpdatesAndChannels(group, states, true)
 		if err != nil {
 			log.Fatalf("Error searching for outdated MUs repos: %v", err)
 		}
@@ -85,7 +89,7 @@ func muFindAndSync() {
 		log.Println("...done!")
 	} else {
 		if thisMU == "" {
-			updateList, err := client.GetUpdatesAndChannels(justSearch)
+			updateList, err := client.GetUpdatesAndChannels(group, states, justSearch)
 			if err != nil {
 				log.Fatalf("Error finding updates and channels: %v", err)
 			}
