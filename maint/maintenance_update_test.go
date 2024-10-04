@@ -44,3 +44,28 @@ func TestToIncidentNumberSet(t *testing.T) {
 		})
 	}
 }
+
+func TestCleanWebChunks(t *testing.T) {
+	tests := []struct {
+		name   string
+		chunks []string
+		want   []string
+	}{
+		{
+			"All valid",
+			[]string{">SUSE_SLE-15-SP4_Update/<", ">SUSE_SLE-15-SP6_Pool/<", ">openSUSE_Leap-15.5/<"},
+			[]string{"SUSE_SLE-15-SP4_Update/", "SUSE_SLE-15-SP6_Pool/", "openSUSE_Leap-15.5/"},
+		},
+		{
+			"Some junk",
+			[]string{"SUSE ", ">SUSE_SLE-15-SP4_Update/<", ">SUSE_SLE-15-SP6_Pool/<", ">openSUSE_Leap-15.5/<", "=\"SUSE_SLE-15-SP6_Pool\""},
+			[]string{"SUSE_SLE-15-SP4_Update/", "SUSE_SLE-15-SP6_Pool/", "openSUSE_Leap-15.5/"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cleanWebChunks(tt.chunks)
+			assert.ElementsMatch(t, tt.want, got)
+		})
+	}
+}
