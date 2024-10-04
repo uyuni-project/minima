@@ -101,20 +101,31 @@ var (
 			Noarch:               "all",
 		},
 	}
-	Legacy bool
+	SkipLegacy bool
 )
 
 // Syncer syncs repos from an HTTP source to a Storage
 type Syncer struct {
 	// URL of the repo this syncer syncs
 	URL     url.URL
-	archs   map[string]bool
 	storage Storage
 }
 
+// Decision encodes what to do with a file
+type Decision int
+
+const (
+	// Download means the Syncer will download a file
+	Download Decision = iota
+	// Recycle means the Syncer will copy an existing file without downloading
+	Recycle
+	// Skip means the Syncer detected an already-existing file and has nothing to do
+	Skip
+)
+
 // NewSyncer creates a new Syncer
-func NewSyncer(url url.URL, archs map[string]bool, storage Storage) *Syncer {
-	return &Syncer{url, archs, storage}
+func NewSyncer(url url.URL, storage Storage) *Syncer {
+	return &Syncer{url, storage}
 }
 
 // StoreRepo stores an HTTP repo in a Storage, automatically retrying in case of recoverable errors
@@ -190,11 +201,6 @@ func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
 	return
 }
 
-// downloadStore downloads a repo-relative path into a file
-func (r *Syncer) downloadStore(path string, description string) error {
-	return r.downloadStoreApply(path, "", description, 0, util.Nop)
-}
-
 // downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
 func (r *Syncer) downloadStoreApply(relativePath string, checksum string, description string, hash crypto.Hash, f util.ReaderConsumer) error {
 	log.Printf("Downloading %v...", description)
@@ -232,6 +238,7 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 			log.Printf(data[i].Location.Href)
 			metadataLocation := data[i].Location.Href
 			metadataChecksum := data[i].Checksum
+
 			decision := r.decide(metadataLocation, metadataChecksum, checksumMap)
 			switch decision {
 			case Download:
@@ -404,38 +411,29 @@ func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum,
 	if err != nil {
 		return
 	}
+
 	compType := strings.Trim(filepath.Ext(path), ".")
 	primary, err := repoType.DecodePackages(reader, compType)
 	if err != nil {
 		return
 	}
 
-	allArchs := len(r.archs) == 0
 	for _, pack := range primary.Packages {
-		if allArchs || pack.Arch == repoType.Noarch || r.archs[pack.Arch] || (r.archs["i586"] && pack.Arch == "i686") || (Legacy && (r.archs["x86_64"] && (pack.Arch == "i586" || pack.Arch == "i686"))) {
-			decision := r.decide(pack.Location.Href, pack.Checksum, checksumMap)
-			switch decision {
-			case Download:
-				packagesToDownload = append(packagesToDownload, pack)
-			case Recycle:
-				packagesToRecycle = append(packagesToRecycle, pack)
-			}
+		if SkipLegacy && (pack.Arch == "i586" || pack.Arch == "i686") {
+			fmt.Println("Skipping legacy package:", pack.Location.Href)
+			continue
+		}
+
+		decision := r.decide(pack.Location.Href, pack.Checksum, checksumMap)
+		switch decision {
+		case Download:
+			packagesToDownload = append(packagesToDownload, pack)
+		case Recycle:
+			packagesToRecycle = append(packagesToRecycle, pack)
 		}
 	}
 	return
 }
-
-// Decision encodes what to do with a file
-type Decision int
-
-const (
-	// Download means the Syncer will download a file
-	Download Decision = iota
-	// Recycle means the Syncer will copy an existing file without downloading
-	Recycle
-	// Skip means the Syncer detected an already-existing file and has nothing to do
-	Skip
-)
 
 func (r *Syncer) decide(location string, checksum XMLChecksum, checksumMap map[string]XMLChecksum) Decision {
 	previousChecksum, foundInChecksumMap := checksumMap[location]
