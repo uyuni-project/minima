@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/uyuni-project/minima/storage"
 	"github.com/uyuni-project/minima/util"
 	"golang.org/x/crypto/openpgp"
 )
@@ -108,7 +109,7 @@ var (
 type Syncer struct {
 	// URL of the repo this syncer syncs
 	URL     url.URL
-	storage Storage
+	storage storage.Storage
 }
 
 // Decision encodes what to do with a file
@@ -124,7 +125,7 @@ const (
 )
 
 // NewSyncer creates a new Syncer
-func NewSyncer(url url.URL, storage Storage) *Syncer {
+func NewSyncer(url url.URL, storage storage.Storage) *Syncer {
 	return &Syncer{url, storage}
 }
 
@@ -359,10 +360,10 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 	checksumMap = make(map[string]XMLChecksum)
 
 	repoType := repoTypes["rpm"]
-	repomdReader, err := r.storage.NewReader(repomdPath, Permanent)
+	repomdReader, err := r.storage.NewReader(repomdPath, storage.Permanent)
 	if err != nil {
-		if err == ErrFileNotFound {
-			repomdReader, err = r.storage.NewReader(releasePath, Permanent)
+		if err == storage.ErrFileNotFound {
+			repomdReader, err = r.storage.NewReader(releasePath, storage.Permanent)
 			if err != nil {
 				log.Println("First-time sync started")
 				return
@@ -387,7 +388,7 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 		dataChecksum := data[i].Checksum
 		checksumMap[dataHref] = dataChecksum
 		if data[i].Type == repoType.PackagesType {
-			primaryReader, err := r.storage.NewReader(dataHref, Permanent)
+			primaryReader, err := r.storage.NewReader(dataHref, storage.Permanent)
 			if err != nil {
 				return
 			}
@@ -407,7 +408,7 @@ func (r *Syncer) readChecksumMap() (checksumMap map[string]XMLChecksum) {
 // processPrimary stores the primary XML metadata file and returns a list of
 // package file paths to download
 func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum, repoType RepoType) (packagesToDownload []XMLPackage, packagesToRecycle []XMLPackage, err error) {
-	reader, err := r.storage.NewReader(path, Temporary)
+	reader, err := r.storage.NewReader(path, storage.Temporary)
 	if err != nil {
 		return
 	}
@@ -439,7 +440,7 @@ func (r *Syncer) decide(location string, checksum XMLChecksum, checksumMap map[s
 	previousChecksum, foundInChecksumMap := checksumMap[location]
 
 	if foundInChecksumMap {
-		reader, err := r.storage.NewReader(location, Permanent)
+		reader, err := r.storage.NewReader(location, storage.Permanent)
 		if err != nil {
 			return Download
 		}
@@ -447,7 +448,7 @@ func (r *Syncer) decide(location string, checksum XMLChecksum, checksumMap map[s
 	}
 
 	if !foundInChecksumMap || previousChecksum.Type != checksum.Type || previousChecksum.Checksum != checksum.Checksum {
-		reader, err := r.storage.NewReader(location, Temporary)
+		reader, err := r.storage.NewReader(location, storage.Temporary)
 		if err != nil {
 			return Download
 		}

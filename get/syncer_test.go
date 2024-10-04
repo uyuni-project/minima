@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/uyuni-project/minima/storage"
 )
 
 func TestStoreRepo(t *testing.T) {
@@ -18,7 +20,7 @@ func TestStoreRepo(t *testing.T) {
 		t.Error(err)
 	}
 
-	storage := NewFileStorage(directory)
+	storage := storage.NewFileStorage(directory)
 	url, err := url.Parse("http://localhost:8080/repo")
 	if err != nil {
 		t.Error(err)
@@ -72,7 +74,7 @@ func TestStoreRepoZstd(t *testing.T) {
 		t.Error(err)
 	}
 
-	storage := NewFileStorage(directory)
+	storage := storage.NewFileStorage(directory)
 	url, err := url.Parse("http://localhost:8080/zstrepo")
 	if err != nil {
 		t.Error(err)
@@ -125,7 +127,7 @@ func TestStoreDebRepo(t *testing.T) {
 		t.Error(err)
 	}
 
-	storage := NewFileStorage(directory)
+	storage := storage.NewFileStorage(directory)
 	url, err := url.Parse("http://localhost:8080/deb_repo")
 	if err != nil {
 		t.Error(err)
