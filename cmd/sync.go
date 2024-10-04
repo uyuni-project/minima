@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"strings"
 
@@ -116,22 +115,7 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 		config.HTTP = append(config.HTTP, httpRepoConfigs...)
 	}
 
-	syncers := []*get.Syncer{}
-	for _, httpRepo := range config.HTTP {
-		repoURL, err := url.Parse(httpRepo.URL)
-		if err != nil {
-			return nil, err
-		}
-
-		storage, err := storage.FromConfig(config.Storage, repoURL)
-		if err != nil {
-			return nil, err
-		}
-
-		syncers = append(syncers, get.NewSyncer(*repoURL, storage))
-	}
-
-	return syncers, nil
+	return get.SyncersFromHTTPRepos(config.HTTP, config.Storage)
 }
 
 func parseConfig(configString string) (Config, error) {

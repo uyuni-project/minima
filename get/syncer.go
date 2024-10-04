@@ -129,6 +129,27 @@ func NewSyncer(url url.URL, storage storage.Storage) *Syncer {
 	return &Syncer{url, storage}
 }
 
+func SyncersFromHTTPRepos(repoConfigs []HTTPRepoConfig, storageConfig storage.StorageConfig) ([]*Syncer, error) {
+	syncers := []*Syncer{}
+
+	for _, httpRepo := range repoConfigs {
+		repoURL, err := url.Parse(httpRepo.URL)
+		if err != nil {
+			return nil, err
+		}
+
+		storage, err := storage.FromConfig(storageConfig, repoURL)
+		if err != nil {
+			return nil, err
+		}
+
+		syncer := NewSyncer(*repoURL, storage)
+		syncers = append(syncers, syncer)
+	}
+
+	return syncers, nil
+}
+
 // StoreRepo stores an HTTP repo in a Storage, automatically retrying in case of recoverable errors
 func (r *Syncer) StoreRepo() (err error) {
 	checksumMap := r.readChecksumMap()
