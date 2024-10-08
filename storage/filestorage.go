@@ -3,7 +3,6 @@ package storage
 import (
 	"crypto"
 	"io"
-	"log"
 	"os"
 	"path"
 
@@ -22,25 +21,24 @@ func NewFileStorage(directory string) Storage {
 
 // NewReader returns a Reader for a file in a location, returns ErrFileNotFound
 // if the requested path was not found at all
-func (s *FileStorage) NewReader(filename string, location Location) (reader io.ReadCloser, err error) {
+func (s *FileStorage) NewReader(filename string, location Location) (io.ReadCloser, error) {
 	var prefix string
 	if location == Permanent {
 		prefix = ""
 	} else {
 		prefix = "-in-progress"
 	}
+
 	fullPath := path.Join(s.directory+prefix, filename)
 	stat, err := os.Stat(fullPath)
 	if os.IsNotExist(err) || stat == nil {
-		err = ErrFileNotFound
-		return
+		return nil, ErrFileNotFound
 	}
 
 	f, err := os.Open(fullPath)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
 	return f, err
 }
 
