@@ -1,23 +1,9 @@
-/*
-Copyright © 2021-2024 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-package cmd
+package maint
 
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"sort"
@@ -59,7 +45,8 @@ func createMockClient(baseUrl string, archs []string, forceError bool) *http.Cli
 		StatusCode: 200,
 		Body: io.NopCloser(bytes.NewBufferString(`<a href=\"/ibs/SUSE:/Maintenance:/number/SUSE_SLE-15-SP4_Update/\">SUSE_SLE-15-SP4_Update/</a>
 		<a href=\"/ibs/SUSE:/Maintenance:/number/SLE-15-SP4_Update/\">SLE-15-SP5_Update/</a>
-		<a href=\"/ibs/SUSE:/Maintenance:/number/SUSE_SLE-15-SP4_Update/\">SUSE_SLE-15-SP6_Update/</a>`)),
+		<a href=\"/ibs/SUSE:/Maintenance:/number/SUSE_SLE-15-SP4_Update/\">SUSE_SLE-15-SP6_Update/</a>
+		<a href=\"/repositories/openSUSE:/Maintenance:/number/openSUSE_15.4_Update_standard/\">openSUSE_15.4_Update_standard/</a>`)),
 	}
 
 	for _, p := range productEntries {
@@ -108,9 +95,11 @@ func TestArchMage(t *testing.T) {
 				URL:   maint + sle15sp4Entry + tt.urlArch,
 				Archs: []string{},
 			}
-			mockClient := createMockClient(maint, tt.validArchs, false)
+			client := BuildServiceClient{
+				httpClient: createMockClient(maint, tt.validArchs, false),
+			}
 
-			err := ArchMage(mockClient, &repo)
+			err := client.archMage(&repo)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
 			assert.ElementsMatch(t, tt.validArchs, repo.Archs)
 		})
@@ -168,9 +157,11 @@ func TestProcWebChunk(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := createMockClient(tt.maint, tt.validArchs, tt.netWorkErr)
+			client := BuildServiceClient{
+				httpClient: createMockClient(tt.maint, tt.validArchs, tt.netWorkErr),
+			}
 
-			got, err := ProcWebChunk(client, tt.product, tt.maint)
+			got, err := client.procWebChunk(tt.product, tt.maint)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
 			assert.Equal(t, len(tt.want), len(got))
 			for i := range tt.want {
@@ -193,7 +184,7 @@ func TestGetProductsForMU(t *testing.T) {
 		{
 			"Chunk without 'SUSE' is discarded",
 			"http://download.suse.de/ibs/SUSE:/Maintenance:/6/",
-			[]string{"SUSE_SLE-15-SP4_Update/", "SUSE_SLE-15-SP6_Update/"},
+			[]string{"SUSE_SLE-15-SP4_Update/", "SUSE_SLE-15-SP6_Update/", "openSUSE_15.4_Update_standard/"},
 			false,
 		},
 		{
@@ -205,9 +196,11 @@ func TestGetProductsForMU(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := createMockClient(tt.mu, []string{}, tt.wantErr)
+			client := BuildServiceClient{
+				httpClient: createMockClient(tt.mu, []string{}, tt.wantErr),
+			}
 
-			got, err := getProductsForMU(client, tt.mu)
+			got, err := client.getProductsForMU(tt.mu)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
 			assert.ElementsMatch(t, tt.want, got)
 		})
@@ -224,7 +217,7 @@ func TestGetRepo(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			"Single arch", "http://download.suse.de/ibs/SUSE:/Maintenance:/8/",
+			"Single arch", "8",
 			[]string{"x86_64"},
 			[]get.HTTPRepo{
 				{
@@ -240,7 +233,7 @@ func TestGetRepo(t *testing.T) {
 			false,
 		},
 		{
-			"Multiple archs", "http://download.suse.de/ibs/SUSE:/Maintenance:/9/",
+			"Multiple archs", "9",
 			[]string{"x86_64", "aarch64", "ppc64le", "s390x"},
 			[]get.HTTPRepo{
 				{
@@ -256,14 +249,14 @@ func TestGetRepo(t *testing.T) {
 			false,
 		},
 		{
-			"No available archs", "http://download.suse.de/ibs/SUSE:/Maintenance:/10/",
+			"No available archs", "10",
 			[]string{},
 			[]get.HTTPRepo{},
 			false,
 			true,
 		},
 		{
-			"Network error", "http://download.suse.de/ibs/SUSE:/Maintenance:/11/",
+			"Network error", "11",
 			[]string{},
 			[]get.HTTPRepo{},
 			true,
@@ -272,9 +265,12 @@ func TestGetRepo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := createMockClient(tt.mu, tt.validArchs, tt.netWorkErr)
+			client := BuildServiceClient{
+				downloadLink: downloadIBSLink,
+				httpClient:   createMockClient(fmt.Sprintf("%s%s/", downloadIBSLink, tt.mu), tt.validArchs, tt.netWorkErr),
+			}
 
-			got, err := GetRepo(client, tt.mu)
+			got, err := client.GetRepo(tt.mu)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
 			assert.Equal(t, len(tt.want), len(got))
 

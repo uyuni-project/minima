@@ -37,10 +37,11 @@ http:
 #       - SLES12-SP2-LTSS-Updates
 #       archs: [x86_64]
 
-# OBS credentials:
-# obs:
-#    username: ""
-#    password: ""
+# Build Service credentials:
+# build_service:
+#    api: obs
+#    username: "user"
+#    password: "passwd"
 ```
 
 
