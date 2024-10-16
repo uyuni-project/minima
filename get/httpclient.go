@@ -6,8 +6,8 @@ import (
 	"net/http"
 )
 
-// HTTPRepoConfig defines the configuration of an HTTP repo
-type HTTPRepoConfig struct {
+// HTTPRepo defines the configuration of an HTTP repo
+type HTTPRepo struct {
 	URL   string
 	Archs []string
 }

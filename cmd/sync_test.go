@@ -32,7 +32,7 @@ func TestParseConfig(t *testing.T) {
 					Type: "file",
 					Path: "/srv/mirror",
 				},
-				HTTP: []get.HTTPRepoConfig{
+				HTTP: []get.HTTPRepo{
 					{
 						URL:   "http://test/SLE-Product-SLES15-SP5-Pool/",
 						Archs: []string{"x86_64", "aarch64", "s390x"},
@@ -76,7 +76,7 @@ func TestParseConfig(t *testing.T) {
 					Type: "memory",
 					Path: "/srv/mirror",
 				},
-				HTTP: []get.HTTPRepoConfig{
+				HTTP: []get.HTTPRepo{
 					{
 						URL:   "http://test/SLE-Product-SLES15-SP5-Pool/",
 						Archs: []string{"x86_64", "aarch64", "s390x"},
