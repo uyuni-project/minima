@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -54,24 +53,23 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			initConfig()
 
-			var errorflag bool = false
-			syncers, err := syncersFromConfig(cfgString)
+			config, err := parseConfig(cfgString)
 			if err != nil {
 				log.Fatal(err)
-				errorflag = true
 			}
+
+			syncers, err := syncersFromConfig(config)
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			for _, syncer := range syncers {
 				log.Printf("Processing repo: %s", syncer.URL.String())
 				err := syncer.StoreRepo()
 				if err != nil {
-					log.Println(err)
-					errorflag = true
-				} else {
-					log.Println("...done.")
+					log.Fatal(err)
 				}
-			}
-			if errorflag {
-				os.Exit(1)
+				log.Println("...done.")
 			}
 		},
 	}
@@ -84,15 +82,11 @@ var (
 type Config struct {
 	Storage      storage.StorageConfig
 	SCC          scc.SCC
-	BuildService maint.BuildServiceCredentials
+	BuildService maint.BuildServiceCredentials `yaml:"build_service"`
 	HTTP         []get.HTTPRepo
 }
 
-func syncersFromConfig(configString string) ([]*get.Syncer, error) {
-	config, err := parseConfig(configString)
-	if err != nil {
-		return nil, err
-	}
+func syncersFromConfig(config Config) ([]*get.Syncer, error) {
 	//---passing the flag value to a global variable in get package, to disables syncing of i586 and i686 rpms (usually inside x86_64)
 	get.SkipLegacy = skipLegacyPackages
 
