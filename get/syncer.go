@@ -130,6 +130,32 @@ func NewSyncer(url url.URL, archs map[string]bool, storage storage.Storage) *Syn
 	return &Syncer{url, archs, storage}
 }
 
+func SyncersFromHTTPRepos(repoConfigs []HTTPRepoConfig, storageConfig storage.StorageConfig) ([]*Syncer, error) {
+	syncers := []*Syncer{}
+
+	for _, httpRepo := range repoConfigs {
+		repoURL, err := url.Parse(httpRepo.URL)
+		if err != nil {
+			return nil, err
+		}
+
+		archs := map[string]bool{}
+		for _, archString := range httpRepo.Archs {
+			archs[archString] = true
+		}
+
+		storage, err := storage.FromConfig(storageConfig, repoURL)
+		if err != nil {
+			return nil, err
+		}
+
+		syncer := NewSyncer(*repoURL, archs, storage)
+		syncers = append(syncers, syncer)
+	}
+
+	return syncers, nil
+}
+
 // StoreRepo stores an HTTP repo in a Storage, automatically retrying in case of recoverable errors
 func (r *Syncer) StoreRepo() (err error) {
 	checksumMap := r.readChecksumMap()
