@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"testing"
 
@@ -72,6 +73,47 @@ func createMockClient(baseUrl string, archs []string, forceError bool) *http.Cli
 			responses:  responses,
 			forceError: forceError,
 		},
+	}
+}
+
+func TestNewBuildServiceClient(t *testing.T) {
+	tests := []struct {
+		name         string
+		buildservice string
+		want         *BuildServiceClient
+		wantErr      bool
+	}{
+		{
+			"IBS client", "ibs",
+			&BuildServiceClient{
+				downloadLink: downloadIBSLink,
+				baseURL:      &url.URL{Host: ibsAPI, Scheme: "https"},
+			},
+			false,
+		},
+		{
+			"OBS client", "obs",
+			&BuildServiceClient{
+				downloadLink: downloadOBSLink,
+				baseURL:      &url.URL{Host: obsAPI, Scheme: "https"},
+			},
+			false,
+		},
+		{
+			"Invalid client", "github",
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewBuildServiceClient(BuildService(tt.buildservice), "test", "test")
+			assert.EqualValues(t, tt.wantErr, (err != nil))
+			if tt.want != nil {
+				assert.EqualValues(t, tt.want.downloadLink, got.downloadLink)
+				assert.EqualValues(t, tt.want.baseURL, got.baseURL)
+			}
+		})
 	}
 }
 
