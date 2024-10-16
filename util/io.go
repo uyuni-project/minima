@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"io/ioutil"
 )
 
 // ReaderConsumer consumes bytes from a Reader
@@ -76,7 +75,7 @@ var discardBuffer = make([]byte, 4*1024*1024)
 // Close closes the internal reader and writer
 func (t *TeeReadCloser) Close() (err error) {
 	// read any remaining bytes from the teeReader (discarding them)
-	_, err = io.CopyBuffer(ioutil.Discard, t.teeReader, discardBuffer)
+	_, err = io.CopyBuffer(io.Discard, t.teeReader, discardBuffer)
 	if err != nil {
 		t.reader.Close()
 		t.writer.Close()
