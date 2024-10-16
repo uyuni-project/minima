@@ -5,11 +5,11 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/uyuni-project/minima/get"
+	"github.com/uyuni-project/minima/storage"
 	"github.com/uyuni-project/minima/updates"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -82,7 +82,7 @@ var (
 
 // Config maps the configuration in minima.yaml
 type Config struct {
-	Storage get.StorageConfig
+	Storage storage.StorageConfig
 	SCC     get.SCC
 	OBS     updates.OBS
 	HTTP    []get.HTTPRepoConfig
@@ -128,16 +128,11 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 			archs[archString] = true
 		}
 
-		var storage get.Storage
-		switch config.Storage.Type {
-		case "file":
-			storage = get.NewFileStorage(filepath.Join(config.Storage.Path, filepath.FromSlash(repoURL.Path)))
-		case "s3":
-			storage, err = get.NewS3Storage(config.Storage.AccessKeyID, config.Storage.AccessKeyID, config.Storage.Region, config.Storage.Bucket+repoURL.Path)
-			if err != nil {
-				return nil, err
-			}
+		storage, err := storage.FromConfig(config.Storage, repoURL)
+		if err != nil {
+			return nil, err
 		}
+
 		syncers = append(syncers, get.NewSyncer(*repoURL, archs, storage))
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/uyuni-project/minima/get"
+	"github.com/uyuni-project/minima/storage"
 )
 
 const (
@@ -26,7 +27,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			"Valid HTTP repos", validHTTPReposFile,
 			Config{
-				Storage: get.StorageConfig{
+				Storage: storage.StorageConfig{
 					Type: "file",
 					Path: "/srv/mirror",
 				},
@@ -46,7 +47,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			"Valid SCC repos", validSCCReposFile,
 			Config{
-				Storage: get.StorageConfig{
+				Storage: storage.StorageConfig{
 					Type: "file",
 					Path: "/srv/mirror",
 				},
@@ -70,7 +71,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			"Invalid storage", invalidStoragefile,
 			Config{
-				Storage: get.StorageConfig{
+				Storage: storage.StorageConfig{
 					Type: "memory",
 					Path: "/srv/mirror",
 				},

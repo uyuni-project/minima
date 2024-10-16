@@ -1,4 +1,4 @@
-package get
+package storage
 
 import (
 	"crypto"
@@ -64,7 +64,7 @@ func configureBucket(region string, bucket string, svc *s3.S3) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case s3.ErrCodeBucketAlreadyExists:
-				return errors.New("Bucket name already taken by another AWS user, please use a different name")
+				return errors.New("bucket name already taken by another AWS user, please use a different name")
 			case s3.ErrCodeBucketAlreadyOwnedByYou:
 				return nil
 			default:
