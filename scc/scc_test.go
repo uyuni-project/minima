@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,13 +15,16 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 	expectedToken := base64.URLEncoding.EncodeToString([]byte("user:pass"))
 	expectedAuth := "Basic " + expectedToken
 
+	server := httptest.NewServer(http.DefaultServeMux)
+	defer server.Close()
+
 	http.HandleFunc("/connect/organizations/repositories", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != expectedAuth {
 			w.WriteHeader(401)
 			return
 		}
 
-		w.Header().Set("Link", "<http://localhost:8080/connect/organizations/repositories2>; rel=\"next\"")
+		w.Header().Set("Link", fmt.Sprintf("<%s/connect/organizations/repositories2>; rel=\"next\"", server.URL))
 		fmt.Fprintf(w, "[{\"url\" : \"http://whatever/SLES15-SP5-Pool\", \"name\" : \"SLES15-SP5-Pool\", \"description\" : \"x86_64 aarch64 i586\"}]")
 	})
 
@@ -91,7 +95,7 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			httpConfigs, err := SCCToHTTPConfigs("http://localhost:8080", tt.user, tt.pass, []SCCRepos{
+			httpConfigs, err := SCCToHTTPConfigs(server.URL, tt.user, tt.pass, []SCCRepos{
 				{
 					Names: tt.names,
 					Archs: tt.archs,

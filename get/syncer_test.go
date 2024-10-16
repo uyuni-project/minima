@@ -2,6 +2,7 @@ package get
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -29,7 +30,10 @@ func TestSyncersFromHTTPRepo(t *testing.T) {
 }
 
 func TestStoreRepo(t *testing.T) {
-	// Respond to http://localhost:8080/repo serving the content of the testdata/repo directory
+	server := httptest.NewServer(http.DefaultServeMux)
+	defer server.Close()
+
+	// Respond to /repo serving the content of the testdata/repo directory
 	http.Handle("/", http.FileServer(http.Dir("testdata")))
 
 	directory := filepath.Join(os.TempDir(), "syncer_test")
@@ -42,7 +46,7 @@ func TestStoreRepo(t *testing.T) {
 		"x86_64": true,
 	}
 	storage := storage.NewFileStorage(directory)
-	url, err := url.Parse("http://localhost:8080/repo")
+	url, err := url.Parse(server.URL + "/repo")
 	if err != nil {
 		t.Error(err)
 	}
@@ -89,6 +93,9 @@ func TestStoreRepo(t *testing.T) {
 }
 
 func TestStoreRepoZstd(t *testing.T) {
+	server := httptest.NewServer(http.DefaultServeMux)
+	defer server.Close()
+
 	directory := filepath.Join(os.TempDir(), "syncer_test")
 	err := os.RemoveAll(directory)
 	if err != nil {
@@ -99,7 +106,7 @@ func TestStoreRepoZstd(t *testing.T) {
 		"x86_64": true,
 	}
 	storage := storage.NewFileStorage(directory)
-	url, err := url.Parse("http://localhost:8080/zstrepo")
+	url, err := url.Parse(server.URL + "/zstrepo")
 	if err != nil {
 		t.Error(err)
 	}
@@ -145,6 +152,9 @@ func TestStoreRepoZstd(t *testing.T) {
 }
 
 func TestStoreDebRepo(t *testing.T) {
+	server := httptest.NewServer(http.DefaultServeMux)
+	defer server.Close()
+
 	directory := filepath.Join(os.TempDir(), "syncer_test")
 	err := os.RemoveAll(directory)
 	if err != nil {
@@ -156,7 +166,7 @@ func TestStoreDebRepo(t *testing.T) {
 	}
 
 	storage := storage.NewFileStorage(directory)
-	url, err := url.Parse("http://localhost:8080/deb_repo")
+	url, err := url.Parse(server.URL + "/deb_repo")
 	if err != nil {
 		t.Error(err)
 	}
