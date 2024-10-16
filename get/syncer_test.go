@@ -18,12 +18,15 @@ func TestStoreRepo(t *testing.T) {
 		t.Error(err)
 	}
 
+	archs := map[string]bool{
+		"x86_64": true,
+	}
 	storage := NewFileStorage(directory)
 	url, err := url.Parse("http://localhost:8080/repo")
 	if err != nil {
 		t.Error(err)
 	}
-	syncer := NewSyncer(*url, storage)
+	syncer := NewSyncer(*url, archs, storage)
 
 	// first sync
 	err = syncer.StoreRepo()
@@ -72,12 +75,15 @@ func TestStoreRepoZstd(t *testing.T) {
 		t.Error(err)
 	}
 
+	archs := map[string]bool{
+		"x86_64": true,
+	}
 	storage := NewFileStorage(directory)
 	url, err := url.Parse("http://localhost:8080/zstrepo")
 	if err != nil {
 		t.Error(err)
 	}
-	syncer := NewSyncer(*url, storage)
+	syncer := NewSyncer(*url, archs, storage)
 
 	// first sync
 	err = syncer.StoreRepo()
@@ -125,12 +131,16 @@ func TestStoreDebRepo(t *testing.T) {
 		t.Error(err)
 	}
 
+	archs := map[string]bool{
+		"amd64": true,
+	}
+
 	storage := NewFileStorage(directory)
 	url, err := url.Parse("http://localhost:8080/deb_repo")
 	if err != nil {
 		t.Error(err)
 	}
-	syncer := NewSyncer(*url, storage)
+	syncer := NewSyncer(*url, archs, storage)
 
 	// first sync
 	err = syncer.StoreRepo()

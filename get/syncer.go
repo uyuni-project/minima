@@ -108,6 +108,7 @@ var (
 type Syncer struct {
 	// URL of the repo this syncer syncs
 	URL     url.URL
+	archs   map[string]bool
 	storage Storage
 }
 
@@ -124,8 +125,8 @@ const (
 )
 
 // NewSyncer creates a new Syncer
-func NewSyncer(url url.URL, storage Storage) *Syncer {
-	return &Syncer{url, storage}
+func NewSyncer(url url.URL, archs map[string]bool, storage Storage) *Syncer {
+	return &Syncer{url, archs, storage}
 }
 
 // StoreRepo stores an HTTP repo in a Storage, automatically retrying in case of recoverable errors
@@ -418,18 +419,23 @@ func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum,
 		return
 	}
 
+	allArchs := len(r.archs) == 0
 	for _, pack := range primary.Packages {
-		if SkipLegacy && (pack.Arch == "i586" || pack.Arch == "i686") {
+		legacyPackage := (pack.Arch == "i586" || pack.Arch == "i686")
+
+		if SkipLegacy && legacyPackage {
 			fmt.Println("Skipping legacy package:", pack.Location.Href)
 			continue
 		}
 
-		decision := r.decide(pack.Location.Href, pack.Checksum, checksumMap)
-		switch decision {
-		case Download:
-			packagesToDownload = append(packagesToDownload, pack)
-		case Recycle:
-			packagesToRecycle = append(packagesToRecycle, pack)
+		if allArchs || pack.Arch == repoType.Noarch || r.archs[pack.Arch] || (r.archs["x86_64"] && legacyPackage) {
+			decision := r.decide(pack.Location.Href, pack.Checksum, checksumMap)
+			switch decision {
+			case Download:
+				packagesToDownload = append(packagesToDownload, pack)
+			case Recycle:
+				packagesToRecycle = append(packagesToRecycle, pack)
+			}
 		}
 	}
 	return

@@ -123,6 +123,11 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 			return nil, err
 		}
 
+		archs := map[string]bool{}
+		for _, archString := range httpRepo.Archs {
+			archs[archString] = true
+		}
+
 		var storage get.Storage
 		switch config.Storage.Type {
 		case "file":
@@ -133,7 +138,7 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 				return nil, err
 			}
 		}
-		syncers = append(syncers, get.NewSyncer(*repoURL, storage))
+		syncers = append(syncers, get.NewSyncer(*repoURL, archs, storage))
 	}
 
 	return syncers, nil
