@@ -3,7 +3,6 @@ package scc
 import (
 	"encoding/base64"
 	"fmt"
-	"net"
 	"net/http"
 	"testing"
 
@@ -14,16 +13,6 @@ import (
 func TestSCCToHTTPConfigs(t *testing.T) {
 	expectedToken := base64.URLEncoding.EncodeToString([]byte("user:pass"))
 	expectedAuth := "Basic " + expectedToken
-
-	go func() {
-		listener, err := net.Listen("tcp", ":8080")
-		if err != nil {
-			t.Fail()
-		}
-		if err := http.Serve(listener, nil); err != nil {
-			t.Fail()
-		}
-	}()
 
 	http.HandleFunc("/connect/organizations/repositories", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != expectedAuth {
