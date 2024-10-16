@@ -1,4 +1,4 @@
-package get
+package scc
 
 import (
 	"encoding/base64"
@@ -8,24 +8,20 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/uyuni-project/minima/get"
 )
 
 // SCC defines the configuration to be used for downloading packages from SUSE Customer Center
 type SCC struct {
 	Username     string
 	Password     string
-	Repositories []SCCReposConfig
+	Repositories []SCCRepos
 }
 
-// SCCRepoConfig defines the configuration of SCC repos sharing the same architectures
-type SCCReposConfig struct {
+// SCCRepos defines the names of SCC products/repos sharing the same architectures
+type SCCRepos struct {
 	Names []string
-	Archs []string
-}
-
-// HTTPRepoConfig defines the configuration of an HTTP repo
-type HTTPRepoConfig struct {
-	URL   string
 	Archs []string
 }
 
@@ -41,9 +37,9 @@ type Repo struct {
 type sccMap map[string][]string
 
 // SCCToHTTPConfigs returns HTTPS repos configurations (URL and archs) for repos in SCC
-func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfigs []SCCReposConfig) ([]HTTPRepoConfig, error) {
+func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfigs []SCCRepos) ([]get.HTTPRepo, error) {
 	token := base64.URLEncoding.EncodeToString([]byte(username + ":" + password))
-	httpConfigs := []HTTPRepoConfig{}
+	httpConfigs := []get.HTTPRepoConfig{}
 
 	// build a map of name - available archs entries to avoid repeated iterations
 	// on sccConfigs when searching repos by name and archs
@@ -91,8 +87,8 @@ func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfi
 // sccMap entries and build a HTTRepoConfig for it.
 //
 // Returns a HTTPRepoConfig and a bool indicating whether the match was successfull or not.
-func getHTTPConfig(name, description, url string, sccEntries sccMap) (HTTPRepoConfig, bool) {
-	httpConfig := HTTPRepoConfig{
+func getHTTPConfig(name, description, url string, sccEntries sccMap) (get.HTTPRepoConfig, bool) {
+	httpConfig := get.HTTPRepoConfig{
 		Archs: []string{},
 	}
 
@@ -125,7 +121,10 @@ func downloadPaged(url string, token string) (page []byte, next string, err erro
 	}
 
 	if resp.StatusCode != 200 {
-		err = &UnexpectedStatusCodeError{url, resp.StatusCode}
+		err = &get.UnexpectedStatusCodeError{
+			URL:        url,
+			StatusCode: resp.StatusCode,
+		}
 		return
 	}
 

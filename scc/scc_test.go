@@ -1,17 +1,29 @@
-package get
+package scc
 
 import (
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/uyuni-project/minima/get"
 )
 
 func TestSCCToHTTPConfigs(t *testing.T) {
 	expectedToken := base64.URLEncoding.EncodeToString([]byte("user:pass"))
 	expectedAuth := "Basic " + expectedToken
+
+	go func() {
+		listener, err := net.Listen("tcp", ":8080")
+		if err != nil {
+			t.Fail()
+		}
+		if err := http.Serve(listener, nil); err != nil {
+			t.Fail()
+		}
+	}()
 
 	http.HandleFunc("/connect/organizations/repositories", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != expectedAuth {
@@ -34,19 +46,19 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 		pass    string
 		names   []string
 		archs   []string
-		want    []HTTPRepoConfig
+		want    []get.HTTPRepoConfig
 		wantErr bool
 	}{
 		{
 			"One name and no matching arch", "user", "pass",
 			[]string{"SLES15-SP5-Pool"}, []string{"s390x"},
-			[]HTTPRepoConfig{},
+			[]get.HTTPRepoConfig{},
 			false,
 		},
 		{
 			"One name and one matching arch", "user", "pass",
 			[]string{"SLES15-SP5-Pool"}, []string{"x86_64"},
-			[]HTTPRepoConfig{
+			[]get.HTTPRepoConfig{
 				{URL: "http://whatever/SLES15-SP5-Pool", Archs: []string{"x86_64"}},
 			},
 			false,
@@ -54,7 +66,7 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 		{
 			"One name and multiple matching archs", "user", "pass",
 			[]string{"SLES15-SP5-Pool"}, []string{"aarch64", "i586"},
-			[]HTTPRepoConfig{
+			[]get.HTTPRepoConfig{
 				{URL: "http://whatever/SLES15-SP5-Pool", Archs: []string{"aarch64", "i586"}},
 			},
 			false,
@@ -62,13 +74,13 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 		{
 			"Multiple names and no matching archs", "user", "pass",
 			[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"src"},
-			[]HTTPRepoConfig{},
+			[]get.HTTPRepoConfig{},
 			false,
 		},
 		{
 			"Multiple names and multiple matching archs", "user", "pass",
 			[]string{"SLES15-SP5-Pool", "SLES15-SP5-Updates"}, []string{"x86_64", "aarch64"},
-			[]HTTPRepoConfig{
+			[]get.HTTPRepoConfig{
 				{URL: "http://whatever/SLES15-SP5-Pool", Archs: []string{"x86_64", "aarch64"}},
 				{URL: "http://whatever/SLES15-SP5-Updates", Archs: []string{"x86_64", "aarch64"}},
 			},
@@ -77,25 +89,26 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 		{
 			"Invalid user", "thiswillfail", "pass",
 			[]string{"SLES15-SP5-Pool"}, []string{"x86_64"},
-			[]HTTPRepoConfig{},
+			[]get.HTTPRepoConfig{},
 			true,
 		},
 		{
 			"Invalid password", "user", "thiswillfail",
 			[]string{"SLES15-SP5-Pool"}, []string{"x86_64"},
-			[]HTTPRepoConfig{},
+			[]get.HTTPRepoConfig{},
 			true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			httpConfigs, err := SCCToHTTPConfigs("http://localhost:8080", tt.user, tt.pass, []SCCReposConfig{
+			httpConfigs, err := SCCToHTTPConfigs("http://localhost:8080", tt.user, tt.pass, []SCCRepos{
 				{
 					Names: tt.names,
 					Archs: tt.archs,
 				},
 			})
+			fmt.Println(err)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
 			assert.Equal(t, len(tt.want), len(httpConfigs))
 

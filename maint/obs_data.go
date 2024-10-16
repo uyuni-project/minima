@@ -1,4 +1,4 @@
-package updates
+package maint
 
 import (
 	"net/http"

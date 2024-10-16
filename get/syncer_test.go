@@ -7,8 +7,26 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/uyuni-project/minima/storage"
 )
+
+func TestSyncersFromHTTPRepo(t *testing.T) {
+	tests := []struct {
+		name          string
+		httpRepos     []HTTPRepoConfig
+		storageConfig storage.StorageConfig
+		want          []*Syncer
+		wantErr       bool
+	}{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := SyncersFromHTTPRepos(tt.httpRepos, tt.storageConfig)
+			assert.EqualValues(t, tt.wantErr, (err != nil))
+		})
+	}
+}
 
 func TestStoreRepo(t *testing.T) {
 	// Respond to http://localhost:8080/repo serving the content of the testdata/repo directory

@@ -8,8 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/uyuni-project/minima/get"
+	"github.com/uyuni-project/minima/maint"
+	"github.com/uyuni-project/minima/scc"
 	"github.com/uyuni-project/minima/storage"
-	"github.com/uyuni-project/minima/updates"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -81,10 +82,10 @@ var (
 
 // Config maps the configuration in minima.yaml
 type Config struct {
-	Storage storage.StorageConfig
-	SCC     get.SCC
-	OBS     updates.OBS
-	HTTP    []get.HTTPRepoConfig
+	Storage      storage.StorageConfig
+	SCC          scc.SCC
+	BuildService maint.BuildServiceCredentials
+	HTTP         []get.HTTPRepoConfig
 }
 
 func syncersFromConfig(configString string) ([]*get.Syncer, error) {
@@ -100,7 +101,7 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 			if archs == "" {
 				archs = "x86_64"
 			}
-			config.SCC.Repositories = []get.SCCReposConfig{
+			config.SCC.Repositories = []scc.SCCRepos{
 				{
 					Names: []string{thisRepo},
 					Archs: strings.Split(archs, ","),
@@ -108,7 +109,7 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 			}
 		}
 
-		httpRepoConfigs, err := get.SCCToHTTPConfigs(sccUrl, config.SCC.Username, config.SCC.Password, config.SCC.Repositories)
+		httpRepoConfigs, err := scc.SCCToHTTPConfigs(sccUrl, config.SCC.Username, config.SCC.Password, config.SCC.Repositories)
 		if err != nil {
 			return nil, err
 		}
