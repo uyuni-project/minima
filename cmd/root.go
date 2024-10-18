@@ -6,6 +6,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/uyuni-project/minima/get"
+	"github.com/uyuni-project/minima/updates"
+	yaml "gopkg.in/yaml.v2"
 )
 
 var (
@@ -13,6 +16,17 @@ var (
 	cfgFile   string
 	cfgString string
 )
+
+const defaultTimeoutMinutes = 60
+
+// Config maps the configuration in minima.yaml
+type Config struct {
+	Storage        get.StorageConfig
+	SCC            get.SCC
+	OBS            updates.OBS
+	HTTP           []get.HTTPRepoConfig
+	TimeoutMinutes uint `yaml:"timeout_minutes"`
+}
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -66,4 +80,22 @@ func initConfig() {
 		cfgString = string(bytes)
 		fmt.Println("Using config file:", cfgFile)
 	}
+}
+
+func parseConfig(configString string) (Config, error) {
+	config := Config{}
+	if err := yaml.Unmarshal([]byte(configString), &config); err != nil {
+		return config, fmt.Errorf("configuration parse error: %v", err)
+	}
+
+	storageType := config.Storage.Type
+	if storageType != "file" && storageType != "s3" {
+		return config, fmt.Errorf("configuration parse error: unrecognised storage type")
+	}
+
+	if config.TimeoutMinutes == 0 {
+		log.Printf("Applying default timeout of %d minutes to each request\n", defaultTimeoutMinutes)
+		config.TimeoutMinutes = defaultTimeoutMinutes
+	}
+	return config, nil
 }

@@ -41,6 +41,10 @@ http:
 # obs:
 #    username: ""
 #    password: ""
+
+# optional timeout for HTTP requests, in minutes
+# the default is 60 minutes, 0 means no timeout
+timeout_minutes: 30
 ```
 
 

@@ -1,17 +1,16 @@
 package cmd
 
 import (
-	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/uyuni-project/minima/get"
-	"github.com/uyuni-project/minima/updates"
-	yaml "gopkg.in/yaml.v2"
 )
 
 const sccUrl = "https://scc.suse.com"
@@ -54,12 +53,12 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			initConfig()
 
-			var errorflag bool = false
 			syncers, err := syncersFromConfig(cfgString)
 			if err != nil {
 				log.Fatal(err)
-				errorflag = true
 			}
+
+			var errorflag bool = false
 			for _, syncer := range syncers {
 				log.Printf("Processing repo: %s", syncer.URL.String())
 				err := syncer.StoreRepo()
@@ -80,21 +79,16 @@ var (
 	skipLegacyPackages bool
 )
 
-// Config maps the configuration in minima.yaml
-type Config struct {
-	Storage get.StorageConfig
-	SCC     get.SCC
-	OBS     updates.OBS
-	HTTP    []get.HTTPRepoConfig
-}
-
 func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 	config, err := parseConfig(configString)
 	if err != nil {
 		return nil, err
 	}
-	//---passing the flag value to a global variable in get package, to disables syncing of i586 and i686 rpms (usually inside x86_64)
+	// passing the flag value to a global variable in get package, to disables syncing of i586 and i686 rpms (usually inside x86_64)
 	get.SkipLegacy = skipLegacyPackages
+	// Go's default timeout for HTTP clients is 0, meaning there's no timeout
+	// this can lead to connections hanging indefinitely
+	http.DefaultClient.Timeout = time.Duration(config.TimeoutMinutes) * time.Minute
 
 	if config.SCC.Username != "" {
 		if thisRepo != "" {
@@ -142,19 +136,6 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 	}
 
 	return syncers, nil
-}
-
-func parseConfig(configString string) (Config, error) {
-	config := Config{}
-	if err := yaml.Unmarshal([]byte(configString), &config); err != nil {
-		return config, fmt.Errorf("configuration parse error: %v", err)
-	}
-
-	storageType := config.Storage.Type
-	if storageType != "file" && storageType != "s3" {
-		return config, fmt.Errorf("configuration parse error: unrecognised storage type")
-	}
-	return config, nil
 }
 
 func init() {
