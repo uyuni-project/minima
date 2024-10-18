@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/uyuni-project/minima/util"
@@ -138,6 +141,15 @@ func (r *Syncer) StoreRepo() (err error) {
 			return
 		}
 
+		netOpErr, ok := err.(*net.OpError)
+		if ok {
+			syscallErr, ok := netOpErr.Err.(*os.SyscallError)
+			if ok && syscallErr.Err == syscall.ECONNRESET {
+				log.Printf("Connection reset: %v. Retrying ...\n", netOpErr)
+				continue
+			}
+		}
+
 		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
 		if unexpectedStatusCode {
 			sc := uerr.StatusCode
@@ -205,9 +217,9 @@ func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
 // downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
 func (r *Syncer) downloadStoreApply(relativePath string, checksum string, description string, hash crypto.Hash, f util.ReaderConsumer) error {
 	log.Printf("Downloading %v...", description)
-	//log.Printf("SYNCER: %v\n", r)
 	url := r.URL
 	url.Path = path.Join(r.URL.Path, relativePath)
+
 	body, err := ReadURL(url.String())
 	if err != nil {
 		return err
