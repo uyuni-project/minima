@@ -12,6 +12,7 @@ import (
 const (
 	testdataDir        = "testdata"
 	invalidStoragefile = "invalid_storage.yaml"
+	customTimeoutFile  = "custom_timeout.yml"
 	validHTTPReposFile = "valid_http_repos.yaml"
 	validSCCReposFile  = "valid_scc_repos.yaml"
 )
@@ -40,6 +41,7 @@ func TestParseConfig(t *testing.T) {
 						Archs: []string{"x86_64", "aarch64"},
 					},
 				},
+				TimeoutMinutes: 60,
 			},
 			false,
 		},
@@ -64,6 +66,18 @@ func TestParseConfig(t *testing.T) {
 						},
 					},
 				},
+				TimeoutMinutes: 60,
+			},
+			false,
+		},
+		{
+			"Custom timeout", customTimeoutFile,
+			Config{
+				Storage: get.StorageConfig{
+					Type: "file",
+					Path: "/srv/mirror",
+				},
+				TimeoutMinutes: 10,
 			},
 			false,
 		},
