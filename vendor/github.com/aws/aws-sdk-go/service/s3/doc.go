@@ -8,9 +8,9 @@
 // See s3 package documentation for more information.
 // https://docs.aws.amazon.com/sdk-for-go/api/service/s3/
 //
-// Using the Client
+// # Using the Client
 //
-// To Amazon Simple Storage Service with the SDK use the New function to create
+// To contact Amazon Simple Storage Service with the SDK use the New function to create
 // a new service client. With that client you can make API requests to the service.
 // These clients are safe to use concurrently.
 //
