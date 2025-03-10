@@ -64,6 +64,7 @@ var hashMap = map[string]crypto.Hash{
 	"sha":    crypto.SHA1,
 	"sha1":   crypto.SHA1,
 	"sha256": crypto.SHA256,
+	"sha512": crypto.SHA512,
 }
 
 const repomdPath = "repodata/repomd.xml"
@@ -459,6 +460,7 @@ func (r *Syncer) decide(location string, checksum XMLChecksum, checksumMap map[s
 		}
 		defer reader.Close()
 
+		log.Printf("Reading %s checksum\n", checksum.Type)
 		readChecksum, err := util.Checksum(reader, hashMap[checksum.Type])
 		if err != nil || readChecksum != checksum.Checksum {
 			return Download
