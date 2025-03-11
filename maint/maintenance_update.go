@@ -1,20 +1,17 @@
-package updates
+package maint
 
 import (
-	"net/http"
-	"net/url"
+	"regexp"
+
+	"github.com/uyuni-project/minima/get"
 )
 
-const (
-	DownloadIbsLink = "http://download.suse.de/ibs/SUSE:/Maintenance:/"
-	baseUrl         = "api.suse.de"
-)
-
-type Client struct {
-	BaseURL    *url.URL
-	Username   string
-	Password   string
-	HttpClient *http.Client
+type Updates struct {
+	IncidentNumber string
+	ReleaseRequest string
+	SRCRPMS        []string
+	Products       string
+	Repositories   []get.HTTPRepo
 }
 
 type Person struct {
@@ -116,4 +113,31 @@ type Patchinfo struct {
 	Packager    string  `xml:"packager"`
 	Description string  `xml:"description"`
 	Summary     string  `xml:"summary"`
+}
+
+// this operates like an HashSet in other languages - we just care about unique keys,
+// the empty struct is a dummy value for 0 allocation meant to be discarded
+type stringSet map[string]struct{}
+
+// toIncidentNumberSet returns a set-like structure containing the incident numbers for the provided Updates
+func toIncidentNumberSet(updates []Updates) stringSet {
+	incidentNumbers := make(stringSet)
+	for _, elem := range updates {
+		incidentNumbers[elem.IncidentNumber] = struct{}{}
+	}
+	return incidentNumbers
+}
+
+// cleanWebChunks filters a slice of HTML elements and returns a slice containing only SUSE products
+func cleanWebChunks(chunks []string) []string {
+	products := []string{}
+	regEx := regexp.MustCompile(`>((?:open)?SUSE[^<]+\/)<`)
+
+	for _, chunk := range chunks {
+		matches := regEx.FindStringSubmatch(chunk)
+		if matches != nil {
+			products = append(products, matches[1])
+		}
+	}
+	return products
 }

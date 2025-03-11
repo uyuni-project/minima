@@ -1,9 +1,11 @@
-package get
+package storage
 
 import (
 	"crypto"
 	"errors"
 	"io"
+	"net/url"
+	"path/filepath"
 
 	"github.com/uyuni-project/minima/util"
 )
@@ -47,4 +49,21 @@ type Storage interface {
 }
 
 // ErrFileNotFound signals that the requested file was not found
-var ErrFileNotFound = errors.New("File not found")
+var ErrFileNotFound = errors.New("file not found")
+
+// ErrInvalidStorageType signals that the storage type is not supported
+var ErrInvalidStorageType = errors.New("invalid storage type")
+
+// StorageFromConfig returns the Storage implementation defined in the .yaml configuration
+//
+// Returns an error if the storage type is not supported or it was not possible to initialize it correctly
+func FromConfig(config StorageConfig, repoURL *url.URL) (Storage, error) {
+	switch config.Type {
+	case "file":
+		return NewFileStorage(filepath.Join(config.Path, filepath.FromSlash(repoURL.Path))), nil
+	case "s3":
+		return NewS3Storage(config.AccessKeyID, config.AccessKeyID, config.Region, config.Bucket+repoURL.Path)
+	default:
+		return nil, ErrInvalidStorageType
+	}
+}
