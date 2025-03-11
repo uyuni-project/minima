@@ -152,20 +152,20 @@ func (r *Syncer) StoreRepo() (err error) {
 		_, checksumError := err.(*util.ChecksumError)
 		if checksumError {
 			log.Println(err.Error())
-			log.Printf("Checksum did not match, presumably the repo was published while syncing, retrying...\n")
+			log.Println("Checksum did not match, presumably the repo was published while syncing, retrying...")
 			continue
 		}
 
 		_, signatureError := err.(*SignatureError)
 		if signatureError {
 			log.Println(err.Error())
-			log.Printf("Signature not valid, presumably the repo was published while syncing, retrying...\n")
+			log.Println("Signature not valid, presumably the repo was published while syncing, retrying...")
 		} else {
 			return err
 		}
 	}
 
-	log.Printf("Too many temporary errors, aborting...\n")
+	log.Println("Too many temporary errors, aborting...")
 	return err
 }
 
@@ -195,7 +195,7 @@ func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
 		}
 	}
 
-	log.Printf("Committing changes...\n")
+	log.Println("Committing changes...")
 	err = r.storage.Commit()
 	if err != nil {
 		return
@@ -206,7 +206,7 @@ func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
 // downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
 func (r *Syncer) downloadStoreApply(relativePath string, checksum string, description string, hash crypto.Hash, f util.ReaderConsumer) error {
 	log.Printf("Downloading %v...", description)
-	//log.Printf("SYNCER: %v\n", r)
+
 	url := r.URL
 	url.Path = path.Join(r.URL.Path, relativePath)
 	body, err := ReadURL(url.String())
@@ -237,20 +237,20 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 
 		data := repomd.Data
 		for i := 0; i < len(data); i++ {
-			log.Printf(data[i].Location.Href)
+			log.Println(data[i].Location.Href)
 			metadataLocation := data[i].Location.Href
 			metadataChecksum := data[i].Checksum
 
 			decision := r.decide(metadataLocation, metadataChecksum, checksumMap)
 			switch decision {
 			case Download:
-				log.Printf("...downloading")
+				log.Println("...downloading")
 				err = r.downloadStoreApply(metadataLocation, metadataChecksum.Checksum, path.Base(metadataLocation), hashMap[metadataChecksum.Type], util.Nop)
 				if err != nil {
 					return
 				}
 			case Recycle:
-				log.Printf("...recycling")
+				log.Println("...recycling")
 				r.storage.Recycle(metadataLocation)
 			}
 
@@ -267,7 +267,7 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 	})
 	if err != nil {
 		log.Println(err.Error())
-		log.Printf("Fallback to next repo type")
+		log.Println("Fallback to next repo type")
 		// attempt to download Debian's Release file
 		err = r.downloadStoreApply(releasePath, "", path.Base(releasePath), 0, func(reader io.ReadCloser) (err error) {
 			err = doProcessMetadata(reader, repoTypes["deb"])
@@ -298,7 +298,7 @@ func (r *Syncer) checkRepomdSignature(repomdReader io.Reader, repoType RepoType)
 		if err != nil {
 			uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
 			if unexpectedStatusCode && uerr.StatusCode == 404 {
-				log.Printf("Got 404, ignoring...")
+				log.Println("Got 404, ignoring...")
 				err = nil
 			}
 		}
@@ -307,7 +307,7 @@ func (r *Syncer) checkRepomdSignature(repomdReader io.Reader, repoType RepoType)
 	if err != nil {
 		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
 		if unexpectedStatusCode && uerr.StatusCode == 404 {
-			log.Printf("Got 404, ignoring...")
+			log.Println("Got 404, ignoring...")
 			err = nil
 		}
 	}
