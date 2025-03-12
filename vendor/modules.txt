@@ -1,4 +1,4 @@
-# github.com/ProtonMail/go-crypto v1.1.6
+# github.com/ProtonMail/go-crypto v1.1.6 => github.com/pgpkeys-eu/go-crypto v1.1.4-pgpkeys
 ## explicit; go 1.17
 github.com/ProtonMail/go-crypto/bitcurves
 github.com/ProtonMail/go-crypto/brainpool
@@ -139,3 +139,4 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# github.com/ProtonMail/go-crypto => github.com/pgpkeys-eu/go-crypto v1.1.4-pgpkeys

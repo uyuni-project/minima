@@ -61,6 +61,7 @@ type MessageDetails struct {
 	// valid. (An authentication code failure is reported as a
 	// SignatureError error when reading from UnverifiedBody.)
 	Signature            *packet.Signature   // the signature packet itself.
+	SignatureV3          *packet.SignatureV3 // the signature packet if it is a v2 or v3 signature
 	SignatureError       error               // nil if the signature is good.
 	UnverifiedSignatures []*packet.Signature // all other unverified signature packets.
 
@@ -397,6 +398,7 @@ func (scr *signatureCheckReader) Read(buf []byte) (int, error) {
 		var p packet.Packet
 		var readError error
 		var sig *packet.Signature
+		var sigv3 *packet.SignatureV3
 
 		p, readError = scr.packets.Next()
 		for readError == nil {
@@ -418,12 +420,15 @@ func (scr *signatureCheckReader) Read(buf []byte) (int, error) {
 				} else {
 					scr.md.UnverifiedSignatures = append(scr.md.UnverifiedSignatures, sig)
 				}
+			} else if sigv3, ok = p.(*packet.SignatureV3); ok {
+				scr.md.SignatureV3 = sigv3
+				scr.md.SignatureError = scr.md.SignedBy.PublicKey.VerifySignatureV3(scr.h, sigv3)
 			}
 
 			p, readError = scr.packets.Next()
 		}
 
-		if scr.md.SignedBy != nil && scr.md.Signature == nil {
+		if scr.md.SignedBy != nil && scr.md.Signature == nil && scr.md.SignatureV3 == nil {
 			if scr.md.UnverifiedSignatures == nil {
 				scr.md.SignatureError = errors.StructuralError("LiteralData not followed by signature")
 			} else {
@@ -485,6 +490,7 @@ func verifyDetachedSignature(keyring KeyRing, signed, signature io.Reader, expec
 	var sigType packet.SignatureType
 	var keys []Key
 	var p packet.Packet
+	var h hash.Hash
 
 	packets := packet.NewReader(signature)
 	for {
@@ -496,17 +502,29 @@ func verifyDetachedSignature(keyring KeyRing, signed, signature io.Reader, expec
 			return nil, nil, err
 		}
 
-		var ok bool
-		sig, ok = p.(*packet.Signature)
-		if !ok {
+		switch sig := p.(type) {
+		case *packet.Signature:
+			if sig.IssuerKeyId == nil {
+				return nil, nil, errors.StructuralError("signature doesn't have an issuer")
+			}
+			issuerKeyId = *sig.IssuerKeyId
+			hashFunc = sig.Hash
+			sigType = sig.SigType
+			h, err = sig.PrepareVerify()
+			if err != nil {
+				return nil, nil, err
+			}
+		case *packet.SignatureV3:
+			issuerKeyId = sig.IssuerKeyId
+			hashFunc = sig.Hash
+			sigType = sig.SigType
+			h, err = sig.PrepareVerify()
+			if err != nil {
+				return nil, nil, err
+			}
+		default:
 			return nil, nil, errors.StructuralError("non signature packet found")
 		}
-		if sig.IssuerKeyId == nil {
-			return nil, nil, errors.StructuralError("signature doesn't have an issuer")
-		}
-		issuerKeyId = *sig.IssuerKeyId
-		hashFunc = sig.Hash
-		sigType = sig.SigType
 		if checkHashes {
 			matchFound := false
 			// check for hashes
@@ -530,10 +548,6 @@ func verifyDetachedSignature(keyring KeyRing, signed, signature io.Reader, expec
 		panic("unreachable")
 	}
 
-	h, err := sig.PrepareVerify()
-	if err != nil {
-		return nil, nil, err
-	}
 	wrappedHash, err := wrapHashForSignature(h, sigType)
 	if err != nil {
 		return nil, nil, err
@@ -544,10 +558,22 @@ func verifyDetachedSignature(keyring KeyRing, signed, signature io.Reader, expec
 	}
 
 	for _, key := range keys {
-		err = key.PublicKey.VerifySignature(h, sig)
-		if err == nil {
-			return sig, key.Entity, checkMessageSignatureDetails(&key, sig, config)
+		switch sig := p.(type) {
+		case *packet.Signature:
+			err = key.PublicKey.VerifySignature(h, sig)
+			if err == nil {
+				return sig, key.Entity, checkMessageSignatureDetails(&key, sig, config)
+			}
+		case *packet.SignatureV3:
+			err = key.PublicKey.VerifySignatureV3(h, sig)
+			if err == nil {
+				// NB: we are assuming that the first return value is always discarded
+				return nil, key.Entity, nil
+			}
+		default:
+			panic("unreachable")
 		}
+
 	}
 
 	return nil, nil, err

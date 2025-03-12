@@ -22,3 +22,5 @@ require (
 	golang.org/x/sys v0.16.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/ProtonMail/go-crypto => github.com/pgpkeys-eu/go-crypto v1.1.4-pgpkeys

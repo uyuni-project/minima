@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/klauspost/compress/zstd"
 	"github.com/uyuni-project/minima/util"
-	"golang.org/x/crypto/openpgp"
 )
 
 // common
@@ -289,7 +289,7 @@ func (r *Syncer) checkRepomdSignature(repomdReader io.Reader, repoType RepoType)
 			if err != nil {
 				return &SignatureError{keyPath + " file does not contain a valid signature"}
 			}
-			_, err = openpgp.CheckArmoredDetachedSignature(keyring, repomdReader, signatureReader)
+			_, err = openpgp.CheckArmoredDetachedSignature(keyring, repomdReader, signatureReader, nil)
 			if err != nil {
 				return &SignatureError{ascPath + " signature check failed, signature is not valid"}
 			}
