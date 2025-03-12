@@ -36,7 +36,11 @@ func NewAlertsManager(config AlertsConfig) (*AlertsManager, error) {
 
 	if config.Grafana.Enabled {
 		log.Println("Initializig Grafana alerter ...")
-		grafanaAlerter := NewGrafanaAlerter(config.Grafana)
+		grafanaAlerter, err := NewGrafanaAlerter(config.Grafana)
+		if err != nil {
+			return nil, err
+		}
+
 		alerters = append(alerters, grafanaAlerter)
 		log.Println("Grafana alerter ready")
 	}

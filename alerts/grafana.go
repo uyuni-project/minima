@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	alertsEndpoint      = "/alerts"
+	healthCheckEndpoint = "/health"
+)
+
 type GrafanaConfig struct {
 	Enabled    bool
 	AlertTitle string
@@ -18,7 +23,7 @@ type GrafanaConfig struct {
 type GrafanaAlerter struct {
 	httpClient *http.Client
 	key        string
-	alertsUrl  string
+	apiURL     string
 }
 
 type AlertPayload struct {
@@ -27,27 +32,52 @@ type AlertPayload struct {
 	AlertStatus string `json:"status"`
 }
 
-func NewGrafanaAlerter(config GrafanaConfig) *GrafanaAlerter {
-	client := &http.Client{Timeout: 30 * time.Second}
-
-	return &GrafanaAlerter{
-		httpClient: client,
-		alertsUrl:  config.APIUrl + "alerts",
+func NewGrafanaAlerter(config GrafanaConfig) (*GrafanaAlerter, error) {
+	ga := &GrafanaAlerter{
+		httpClient: &http.Client{Timeout: 30 * time.Second},
+		apiURL:     config.APIUrl,
 		key:        config.APIKey,
 	}
+
+	if err := ga.checkHealth(); err != nil {
+		return nil, err
+	}
+	return ga, nil
 }
 
 // Alerter interface implementation
 func (g *GrafanaAlerter) SendAlert(title, content string) error {
 	fmt.Println("Sending Grafana alert")
 
-	if err := g.postGrafanaAlert(title, content); err != nil {
+	if err := g.postAlert(title, content); err != nil {
 		return fmt.Errorf("failed to send Grafana alert: %v", err)
 	}
 	return nil
 }
 
-func (g *GrafanaAlerter) postGrafanaAlert(title, msg string) error {
+// CheckHealth verifies if the Grafana API is reachable
+func (g *GrafanaAlerter) checkHealth() error {
+	req, err := http.NewRequest("GET", g.apiURL+healthCheckEndpoint, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+g.key)
+
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("health check failed for Grafana API, status code: %d", resp.StatusCode)
+	}
+
+	fmt.Println("Grafana API is healthy!")
+	return nil
+}
+
+func (g *GrafanaAlerter) postAlert(title, msg string) error {
 	alert := AlertPayload{
 		Title:       title,
 		Message:     msg,
@@ -59,7 +89,7 @@ func (g *GrafanaAlerter) postGrafanaAlert(title, msg string) error {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", g.alertsUrl, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", g.apiURL+alertsEndpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
