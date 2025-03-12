@@ -9,12 +9,22 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/uyuni-project/minima/alerts"
 	"github.com/uyuni-project/minima/get"
 	"github.com/uyuni-project/minima/updates"
 	yaml "gopkg.in/yaml.v2"
 )
 
 const sccUrl = "https://scc.suse.com"
+
+// Config maps the configuration in minima.yaml
+type Config struct {
+	Alerts  alerts.AlertsConfig
+	Storage get.StorageConfig
+	SCC     get.SCC
+	OBS     updates.OBS
+	HTTP    []get.HTTPRepoConfig
+}
 
 // syncCmd represents the sync command
 var (
@@ -54,18 +64,34 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			initConfig()
 
-			var errorflag bool = false
-			syncers, err := syncersFromConfig(cfgString)
+			config, err := parseConfig(cfgString)
 			if err != nil {
 				log.Fatal(err)
-				errorflag = true
 			}
+
+			syncers, err := syncersFromConfig(config)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			alertsManager, err := alerts.NewAlertsManager(config.Alerts)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			var errorflag bool = false
 			for _, syncer := range syncers {
-				log.Printf("Processing repo: %s", syncer.URL.String())
+				repo := syncer.URL.String()
+				log.Printf("Processing repo: %s", repo)
+
 				err := syncer.StoreRepo()
 				if err != nil {
 					log.Println(err)
 					errorflag = true
+
+					if err := alertsManager.DispatchAlert(repo, err); err != nil {
+						log.Fatal(err)
+					}
 				} else {
 					log.Println("...done.")
 				}
@@ -80,19 +106,7 @@ var (
 	skipLegacyPackages bool
 )
 
-// Config maps the configuration in minima.yaml
-type Config struct {
-	Storage get.StorageConfig
-	SCC     get.SCC
-	OBS     updates.OBS
-	HTTP    []get.HTTPRepoConfig
-}
-
-func syncersFromConfig(configString string) ([]*get.Syncer, error) {
-	config, err := parseConfig(configString)
-	if err != nil {
-		return nil, err
-	}
+func syncersFromConfig(config Config) ([]*get.Syncer, error) {
 	//---passing the flag value to a global variable in get package, to disables syncing of i586 and i686 rpms (usually inside x86_64)
 	get.SkipLegacy = skipLegacyPackages
 

@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/uyuni-project/minima/alerts"
 	"github.com/uyuni-project/minima/get"
 	"github.com/uyuni-project/minima/updates"
 	yaml "gopkg.in/yaml.v2"
@@ -147,18 +148,41 @@ func muFindAndSync() {
 			os.Exit(3)
 		}
 
-		syncers, err := syncersFromConfig(string(byteChunk))
+		config, err := parseConfig(string(byteChunk))
+		if err != nil {
+			log.Fatalf("Error parsing configuration: %v", err)
+		}
+
+		syncers, err := syncersFromConfig(config)
 		if err != nil {
 			log.Fatal(err)
 		}
 
+		alertsManager, err := alerts.NewAlertsManager(config.Alerts)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var errorflag bool = false
 		for _, syncer := range syncers {
-			log.Printf("Processing repo: %s", syncer.URL.String())
+			repo := syncer.URL.String()
+			log.Printf("Processing repo: %s", repo)
+
 			err := syncer.StoreRepo()
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
+				errorflag = true
+
+				if err := alertsManager.DispatchAlert(repo, err); err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				log.Println("...done.")
 			}
-			log.Println("...done.")
+		}
+
+		if errorflag {
+			os.Exit(1)
 		}
 	}
 }
