@@ -2,14 +2,38 @@ package get
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/uyuni-project/minima/storage"
 )
 
+func TestSyncersFromHTTPRepo(t *testing.T) {
+	tests := []struct {
+		name          string
+		httpRepos     []HTTPRepo
+		storageConfig storage.StorageConfig
+		want          []*Syncer
+		wantErr       bool
+	}{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := SyncersFromHTTPRepos(tt.httpRepos, tt.storageConfig)
+			assert.EqualValues(t, tt.wantErr, (err != nil))
+		})
+	}
+}
+
 func TestStoreRepo(t *testing.T) {
-	// Respond to http://localhost:8080/repo serving the content of the testdata/repo directory
+	server := httptest.NewServer(http.DefaultServeMux)
+	defer server.Close()
+
+	// Respond to /repo serving the content of the testdata/repo directory
 	http.Handle("/", http.FileServer(http.Dir("testdata")))
 
 	directory := filepath.Join(os.TempDir(), "syncer_test")
@@ -21,8 +45,8 @@ func TestStoreRepo(t *testing.T) {
 	archs := map[string]bool{
 		"x86_64": true,
 	}
-	storage := NewFileStorage(directory)
-	url, err := url.Parse("http://localhost:8080/repo")
+	storage := storage.NewFileStorage(directory)
+	url, err := url.Parse(server.URL + "/repo")
 	if err != nil {
 		t.Error(err)
 	}
@@ -69,6 +93,9 @@ func TestStoreRepo(t *testing.T) {
 }
 
 func TestStoreRepoZstd(t *testing.T) {
+	server := httptest.NewServer(http.DefaultServeMux)
+	defer server.Close()
+
 	directory := filepath.Join(os.TempDir(), "syncer_test")
 	err := os.RemoveAll(directory)
 	if err != nil {
@@ -78,8 +105,8 @@ func TestStoreRepoZstd(t *testing.T) {
 	archs := map[string]bool{
 		"x86_64": true,
 	}
-	storage := NewFileStorage(directory)
-	url, err := url.Parse("http://localhost:8080/zstrepo")
+	storage := storage.NewFileStorage(directory)
+	url, err := url.Parse(server.URL + "/zstrepo")
 	if err != nil {
 		t.Error(err)
 	}
@@ -125,6 +152,9 @@ func TestStoreRepoZstd(t *testing.T) {
 }
 
 func TestStoreDebRepo(t *testing.T) {
+	server := httptest.NewServer(http.DefaultServeMux)
+	defer server.Close()
+
 	directory := filepath.Join(os.TempDir(), "syncer_test")
 	err := os.RemoveAll(directory)
 	if err != nil {
@@ -135,8 +165,8 @@ func TestStoreDebRepo(t *testing.T) {
 		"amd64": true,
 	}
 
-	storage := NewFileStorage(directory)
-	url, err := url.Parse("http://localhost:8080/deb_repo")
+	storage := storage.NewFileStorage(directory)
+	url, err := url.Parse(server.URL + "/deb_repo")
 	if err != nil {
 		t.Error(err)
 	}
