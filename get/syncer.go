@@ -296,22 +296,27 @@ func (r *Syncer) checkRepomdSignature(repomdReader io.Reader, repoType RepoType)
 			return
 		})
 		if err != nil {
-			uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
-			if unexpectedStatusCode && uerr.StatusCode == 404 {
-				log.Println("Got 404, ignoring...")
-				err = nil
-			}
+			err = ignoreStatusCode(err, 404)
 		}
 		return
 	})
 	if err != nil {
-		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
-		if unexpectedStatusCode && uerr.StatusCode == 404 {
-			log.Println("Got 404, ignoring...")
-			err = nil
-		}
+		err = ignoreStatusCode(err, 403, 404)
 	}
 	return
+}
+
+func ignoreStatusCode(err error, codes ...int) error {
+	uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
+	if unexpectedStatusCode {
+		for _, code := range codes {
+			if uerr.StatusCode == code {
+				log.Printf("Got %d, ignoring...\n", code)
+				return nil
+			}
+		}
+	}
+	return err
 }
 
 // SignatureError is returned if a signature was found but it's invalid
