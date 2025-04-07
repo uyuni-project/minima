@@ -179,8 +179,14 @@ func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
 	downloadCount := len(packagesToDownload)
 	log.Printf("Downloading %v packages...\n", downloadCount)
 	for i, pack := range packagesToDownload {
-		description := fmt.Sprintf("(%v/%v) %v", i+1, downloadCount, path.Base(pack.Location.Href))
-		err = r.downloadStoreApply(pack.Location.Href, pack.Checksum.Checksum, description, hashMap[pack.Checksum.Type], util.Nop)
+		// we need to escape package names because some CDN, proxies (...) are not perfectly RFC 3986 compliant
+		// in such cases characters like '+' (which are common in c++ pkgs) will assume a different meaning
+		name := path.Base(pack.Location.Href)
+		escapedName := url.QueryEscape(name)
+		relativeURL := strings.TrimSuffix(pack.Location.Href, name) + escapedName
+
+		description := fmt.Sprintf("(%v/%v) %v", i+1, downloadCount, name)
+		err = r.downloadStoreApply(relativeURL, pack.Checksum.Checksum, description, hashMap[pack.Checksum.Type], util.Nop)
 		if err != nil {
 			return err
 		}
@@ -207,13 +213,20 @@ func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
 func (r *Syncer) downloadStoreApply(relativePath string, checksum string, description string, hash crypto.Hash, f util.ReaderConsumer) error {
 	log.Printf("Downloading %v...", description)
 
-	url := r.URL
-	url.Path = path.Join(r.URL.Path, relativePath)
-	body, err := ReadURL(url.String())
+	repoURL := r.URL
+	repoURL.Path = path.Join(repoURL.Path, relativePath)
+	finalURL := fmt.Sprintf("%s://%s%s", repoURL.Scheme, repoURL.Host, repoURL.Path)
+
+	body, err := ReadURL(finalURL)
 	if err != nil {
 		return err
 	}
-	return util.Compose(r.storage.StoringMapper(relativePath, checksum, hash), f)(body)
+	// unescape to preserve original pkg name
+	storagePath, err := url.QueryUnescape(relativePath)
+	if err != nil {
+		return err
+	}
+	return util.Compose(r.storage.StoringMapper(storagePath, checksum, hash), f)(body)
 }
 
 // processMetadata stores the repo metadata and returns a list of package file
