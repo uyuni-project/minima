@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/uyuni-project/minima/get"
+	"github.com/uyuni-project/minima/scc"
+	"github.com/uyuni-project/minima/storage"
 )
 
 const (
@@ -26,11 +28,11 @@ func TestParseConfig(t *testing.T) {
 		{
 			"Valid HTTP repos", validHTTPReposFile,
 			Config{
-				Storage: get.StorageConfig{
+				Storage: storage.StorageConfig{
 					Type: "file",
 					Path: "/srv/mirror",
 				},
-				HTTP: []get.HTTPRepoConfig{
+				HTTP: []get.HTTPRepo{
 					{
 						URL:   "http://test/SLE-Product-SLES15-SP5-Pool/",
 						Archs: []string{"x86_64", "aarch64", "s390x"},
@@ -46,14 +48,14 @@ func TestParseConfig(t *testing.T) {
 		{
 			"Valid SCC repos", validSCCReposFile,
 			Config{
-				Storage: get.StorageConfig{
+				Storage: storage.StorageConfig{
 					Type: "file",
 					Path: "/srv/mirror",
 				},
-				SCC: get.SCC{
+				SCC: scc.SCC{
 					Username: "user",
 					Password: "pass",
-					Repositories: []get.SCCReposConfig{
+					Repositories: []scc.SCCRepos{
 						{
 							Names: []string{"SLE-Manager-Tools15-Pool", "SLE-Manager-Tools15-Updates"},
 							Archs: []string{"x86_64", "aarch64", "s390x"},
@@ -70,11 +72,11 @@ func TestParseConfig(t *testing.T) {
 		{
 			"Invalid storage", invalidStoragefile,
 			Config{
-				Storage: get.StorageConfig{
+				Storage: storage.StorageConfig{
 					Type: "memory",
 					Path: "/srv/mirror",
 				},
-				HTTP: []get.HTTPRepoConfig{
+				HTTP: []get.HTTPRepo{
 					{
 						URL:   "http://test/SLE-Product-SLES15-SP5-Pool/",
 						Archs: []string{"x86_64", "aarch64", "s390x"},
