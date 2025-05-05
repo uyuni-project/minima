@@ -215,7 +215,7 @@ func (r *Syncer) downloadStoreApply(relativePath string, checksum string, descri
 
 	repoURL := r.URL
 	repoURL.Path = path.Join(repoURL.Path, relativePath)
-	finalURL := fmt.Sprintf("%s://%s%s", repoURL.Scheme, repoURL.Host, repoURL.Path)
+	finalURL := fmt.Sprintf("%s://%s%s?%s", repoURL.Scheme, repoURL.Host, repoURL.Path, repoURL.Query().Encode())
 
 	body, err := ReadURL(finalURL)
 	if err != nil {
