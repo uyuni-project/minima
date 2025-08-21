@@ -2,24 +2,28 @@ package get
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
 func TestReadURL(t *testing.T) {
-	// Respond to http://localhost:8080/test with "Hello, World"
+	server := httptest.NewServer(http.DefaultServeMux)
+	defer server.Close()
+
+	// Respond to /test with "Hello, World"
 	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, World")
 	})
 
 	// 200
-	reader, err := ReadURL("http://localhost:8080/test")
+	reader, err := ReadURL(server.URL + "/test")
 	if err != nil {
 		t.Error(err)
 	}
 
-	result, err := ioutil.ReadAll(reader)
+	result, err := io.ReadAll(reader)
 	if err != nil {
 		t.Error(err)
 	}
@@ -28,7 +32,7 @@ func TestReadURL(t *testing.T) {
 	}
 
 	// 404
-	_, err = ReadURL("http://localhost:8080/not_existing")
+	_, err = ReadURL(server.URL + "/not_existing")
 
 	uerr, unexpected := err.(*UnexpectedStatusCodeError)
 	if !unexpected {
