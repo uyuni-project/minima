@@ -1,9 +1,8 @@
-package get
+package storage
 
 import (
 	"crypto"
 	"io"
-	"log"
 	"os"
 	"path"
 
@@ -22,25 +21,22 @@ func NewFileStorage(directory string) Storage {
 
 // NewReader returns a Reader for a file in a location, returns ErrFileNotFound
 // if the requested path was not found at all
-func (s *FileStorage) NewReader(filename string, location Location) (reader io.ReadCloser, err error) {
-	var prefix string
-	if location == Permanent {
-		prefix = ""
-	} else {
-		prefix = "-in-progress"
+func (s *FileStorage) NewReader(filename string, location Location) (io.ReadCloser, error) {
+	var suffix string
+	if location != Permanent {
+		suffix = "-in-progress"
 	}
-	fullPath := path.Join(s.directory+prefix, filename)
+
+	fullPath := path.Join(s.directory+suffix, filename)
 	stat, err := os.Stat(fullPath)
 	if os.IsNotExist(err) || stat == nil {
-		err = ErrFileNotFound
-		return
+		return nil, ErrFileNotFound
 	}
 
 	f, err := os.Open(fullPath)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
 	return f, err
 }
 
@@ -82,17 +78,21 @@ func (s *FileStorage) Recycle(filename string) (err error) {
 
 // Commit moves any temporary file accumulated so far to the permanent location
 func (s *FileStorage) Commit() (err error) {
+	// remove previous tmp backups
 	err = os.RemoveAll(s.directory + "-old")
 	if err != nil {
 		return
 	}
+	// tmp backup in case something goes wrong
 	err = os.Rename(s.directory, s.directory+"-old")
 	if err != nil && !os.IsNotExist(err) {
 		return
 	}
+	// move from in-progress to the final repo
 	err = os.Rename(s.directory+"-in-progress", s.directory)
 	if err != nil {
 		return
 	}
+	// cleanup tmp backup
 	return os.RemoveAll(s.directory + "-old")
 }
