@@ -19,7 +19,7 @@ var (
 	RootCmd = &cobra.Command{
 		Use:   "minima",
 		Short: "A Simple Linux Repository Manager",
-		Long:  "minima is an application to mirror and manage Linux package repos.",
+		Long:  "minima mirrors and manages Linux package repositories.",
 		Run: func(cmd *cobra.Command, args []string) {
 			versionFlag, _ := cmd.Flags().GetBool("version")
 			if versionFlag {
