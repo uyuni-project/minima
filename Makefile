@@ -6,6 +6,9 @@ build:
 run-sync: build
 	@cd ./bin && ./minima sync -c minima.yaml
 
+run-sync-quiet: build
+	@cd ./bin && ./minima sync --quiet -c minima.yaml
+
 test:
 	@$$GO_EXECUTABLE_PATH test -v -race ./...
 

@@ -111,6 +111,7 @@ type Syncer struct {
 	URL     url.URL
 	archs   map[string]bool
 	storage Storage
+	quiet   bool
 }
 
 // Decision encodes what to do with a file
@@ -126,8 +127,8 @@ const (
 )
 
 // NewSyncer creates a new Syncer
-func NewSyncer(url url.URL, archs map[string]bool, storage Storage) *Syncer {
-	return &Syncer{url, archs, storage}
+func NewSyncer(url url.URL, archs map[string]bool, storage Storage, quiet bool) *Syncer {
+	return &Syncer{url, archs, storage, quiet}
 }
 
 // StoreRepo stores an HTTP repo in a Storage, automatically retrying in case of recoverable errors
@@ -211,7 +212,9 @@ func (r *Syncer) storeRepo(checksumMap map[string]XMLChecksum) (err error) {
 
 // downloadStoreApply downloads a repo-relative path into a file, while applying a ReaderConsumer
 func (r *Syncer) downloadStoreApply(relativePath string, checksum string, description string, hash crypto.Hash, f util.ReaderConsumer) error {
-	log.Printf("Downloading %v...", description)
+	if !r.quiet {
+		log.Printf("Downloading %v...", description)
+	}
 
 	repoURL := r.URL
 	repoURL.Path = path.Join(repoURL.Path, relativePath)
@@ -250,20 +253,29 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 
 		data := repomd.Data
 		for i := 0; i < len(data); i++ {
-			log.Println(data[i].Location.Href)
+			if !r.quiet {
+				log.Println(data[i].Location.Href)
+			}
+
 			metadataLocation := data[i].Location.Href
 			metadataChecksum := data[i].Checksum
 
 			decision := r.decide(metadataLocation, metadataChecksum, checksumMap)
 			switch decision {
 			case Download:
-				log.Println("...downloading")
+				if !r.quiet {
+					log.Println("...downloading")
+				}
+
 				err = r.downloadStoreApply(metadataLocation, metadataChecksum.Checksum, path.Base(metadataLocation), hashMap[metadataChecksum.Type], util.Nop)
 				if err != nil {
 					return
 				}
 			case Recycle:
-				log.Println("...recycling")
+				if !r.quiet {
+					log.Println("...recycling")
+				}
+
 				r.storage.Recycle(metadataLocation)
 			}
 

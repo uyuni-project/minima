@@ -95,7 +95,7 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 					Names: tt.names,
 					Archs: tt.archs,
 				},
-			})
+			}, false)
 			assert.EqualValues(t, tt.wantErr, (err != nil))
 			assert.Equal(t, len(tt.want), len(httpConfigs))
 
