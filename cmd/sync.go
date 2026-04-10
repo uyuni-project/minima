@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
 	"github.com/uyuni-project/minima/get"
 	"github.com/uyuni-project/minima/updates"
 	yaml "gopkg.in/yaml.v2"
@@ -53,9 +54,10 @@ var (
   `,
 		Run: func(cmd *cobra.Command, args []string) {
 			initConfig()
+			quiet, _ := cmd.Flags().GetBool("quiet")
 
 			var errorflag bool = false
-			syncers, err := syncersFromConfig(cfgString)
+			syncers, err := syncersFromConfig(cfgString, quiet)
 			if err != nil {
 				log.Fatal(err)
 				errorflag = true
@@ -88,7 +90,7 @@ type Config struct {
 	HTTP    []get.HTTPRepoConfig
 }
 
-func syncersFromConfig(configString string) ([]*get.Syncer, error) {
+func syncersFromConfig(configString string, quiet bool) ([]*get.Syncer, error) {
 	config, err := parseConfig(configString)
 	if err != nil {
 		return nil, err
@@ -109,7 +111,7 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 			}
 		}
 
-		httpRepoConfigs, err := get.SCCToHTTPConfigs(sccUrl, config.SCC.Username, config.SCC.Password, config.SCC.Repositories)
+		httpRepoConfigs, err := get.SCCToHTTPConfigs(sccUrl, config.SCC.Username, config.SCC.Password, config.SCC.Repositories, quiet)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +140,7 @@ func syncersFromConfig(configString string) ([]*get.Syncer, error) {
 				return nil, err
 			}
 		}
-		syncers = append(syncers, get.NewSyncer(*repoURL, archs, storage))
+		syncers = append(syncers, get.NewSyncer(*repoURL, archs, storage, quiet))
 	}
 
 	return syncers, nil

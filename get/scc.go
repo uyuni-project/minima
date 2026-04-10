@@ -41,7 +41,7 @@ type Repo struct {
 type sccMap map[string][]string
 
 // SCCToHTTPConfigs returns HTTPS repos configurations (URL and archs) for repos in SCC
-func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfigs []SCCReposConfig) ([]HTTPRepoConfig, error) {
+func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfigs []SCCReposConfig, quiet bool) ([]HTTPRepoConfig, error) {
 	token := base64.URLEncoding.EncodeToString([]byte(username + ":" + password))
 	httpConfigs := []HTTPRepoConfig{}
 
@@ -58,7 +58,7 @@ func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfi
 	var err error
 	next := baseURL + "/connect/organizations/repositories"
 
-	fmt.Println("Repos available in SCC follow:")
+	fmt.Println("Checking available SCC repositories ...")
 	for {
 		page, next, err = downloadPaged(next, token)
 		if err != nil {
@@ -72,7 +72,10 @@ func SCCToHTTPConfigs(baseURL string, username string, password string, sccConfi
 		}
 
 		for _, repo := range repos {
-			fmt.Printf("  %s: %s\n", repo.Name, repo.Description)
+			if !quiet {
+				fmt.Printf("  %s: %s\n", repo.Name, repo.Description)
+			}
+
 			config, ok := getHTTPConfig(repo.Name, repo.Description, repo.URL, sccEntries)
 			if ok {
 				httpConfigs = append(httpConfigs, config)

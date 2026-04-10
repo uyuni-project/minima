@@ -15,20 +15,22 @@ var (
 )
 
 // RootCmd represents the base command when called without any subcommands
-var RootCmd = &cobra.Command{
-	Use:   "minima",
-	Short: "A Simple Linux Repository Manager",
-	Long:  "minima is an application to mirror and manage Linux package repos.",
-	Run: func(cmd *cobra.Command, args []string) {
-		versionFlag, _ := cmd.Flags().GetBool("version")
-		if versionFlag {
-			fmt.Printf("minima %s\n", version)
-			os.Exit(0)
-		}
+var (
+	RootCmd = &cobra.Command{
+		Use:   "minima",
+		Short: "A Simple Linux Repository Manager",
+		Long:  "minima is an application to mirror and manage Linux package repos.",
+		Run: func(cmd *cobra.Command, args []string) {
+			versionFlag, _ := cmd.Flags().GetBool("version")
+			if versionFlag {
+				fmt.Printf("minima %s\n", version)
+				os.Exit(0)
+			}
 
-		cmd.Help()
-	},
-}
+			cmd.Help()
+		},
+	}
+)
 
 // Execute adds all child commands to the root command sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -43,6 +45,7 @@ func Execute(versionTag string) {
 func init() {
 	// all sub-commands will have access to this flag
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "minima.yaml", "config file")
+	RootCmd.PersistentFlags().BoolP("quiet", "q", false, "greatly reduces the number of logs")
 	// local flags
 	RootCmd.Flags().BoolP("version", "v", false, "Print minima version")
 }

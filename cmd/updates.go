@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
 	"github.com/uyuni-project/minima/get"
 	"github.com/uyuni-project/minima/updates"
 	yaml "gopkg.in/yaml.v2"
@@ -60,7 +61,9 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			initConfig()
-			muFindAndSync()
+			quiet, _ := cmd.Flags().GetBool("quiet")
+
+			muFindAndSync(quiet)
 		},
 	}
 	spitYamls  bool
@@ -78,7 +81,7 @@ func init() {
 	updateCmd.Flags().BoolVarP(&cleanup, "cleanup", "k", false, "flag that triggers cleaning up the storage (from old MU channels)")
 }
 
-func muFindAndSync() {
+func muFindAndSync(quiet bool) {
 	config := Config{}
 	updateList := []Updates{}
 
@@ -147,7 +150,7 @@ func muFindAndSync() {
 			os.Exit(3)
 		}
 
-		syncers, err := syncersFromConfig(string(byteChunk))
+		syncers, err := syncersFromConfig(string(byteChunk), quiet)
 		if err != nil {
 			log.Fatal(err)
 		}
