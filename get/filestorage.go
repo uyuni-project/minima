@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/uyuni-project/minima/util"
 )
@@ -80,19 +81,76 @@ func (s *FileStorage) Recycle(filename string) (err error) {
 	return
 }
 
-// Commit moves any temporary file accumulated so far to the permanent location
-func (s *FileStorage) Commit() (err error) {
-	err = os.RemoveAll(s.directory + "-old")
+// Commit will take care of moving downloaded metadata and packages in the target
+// path, plus cleanup old or temporary files
+func (s *FileStorage) Commit() error {
+	oldDir := s.directory + "-old"
+	tmpDir := s.directory + "-in-progress"
+
+	// If in-progress contains actual packages, it is a candidate for being swapped with the target repo.
+	// Otherwise, it's a situation where we only have metadata in x-in-progress.
+	if hasPackages(tmpDir) {
+		os.RemoveAll(oldDir)
+
+		if err := os.Rename(s.directory, oldDir); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		if err := os.Rename(tmpDir, s.directory); err != nil {
+			return err
+		}
+
+		return os.RemoveAll(oldDir)
+	}
+
+	// Move all new files (likely just repodata) from -in-progress to the target
+	if err := mergeDirs(tmpDir, s.directory); err != nil {
+		return err
+	}
+	return os.RemoveAll(tmpDir)
+}
+
+func hasPackages(dir string) bool {
+	found := false
+	// We check for common package extensions used in Linux distros
+	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() {
+			ext := filepath.Ext(path)
+			if _, check := packageExtensions[ext]; check {
+				found = true
+				return filepath.SkipAll // Stop walking as soon as one is found
+			}
+		}
+		return nil
+	})
+	return found
+}
+
+// mergeDirs moves the contents of the repository at source path into the repository at target path
+func mergeDirs(source, target string) error {
+	// ensure target directory exists
+	if err := os.MkdirAll(target, 0755); err != nil {
+		return err
+	}
+
+	dirs, err := os.ReadDir(source)
 	if err != nil {
-		return
+		return err
 	}
-	err = os.Rename(s.directory, s.directory+"-old")
-	if err != nil && !os.IsNotExist(err) {
-		return
+
+	for _, dir := range dirs {
+		from := filepath.Join(source, dir.Name())
+		to := filepath.Join(target, dir.Name())
+		// cleanup previous entries in the target to prevent errors
+		_ = os.RemoveAll(to)
+
+		err = os.Rename(from, to)
+		if err != nil {
+			return err
+		}
 	}
-	err = os.Rename(s.directory+"-in-progress", s.directory)
-	if err != nil {
-		return
-	}
-	return os.RemoveAll(s.directory + "-old")
+
+	return nil
 }
