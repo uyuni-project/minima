@@ -30,3 +30,8 @@ minima.yaml
 # Test coverage 
 
 cover.profile
+
+# IDEs
+
+.vscode
+.idea
