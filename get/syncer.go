@@ -80,6 +80,11 @@ type RepoType struct {
 }
 
 var (
+	packageExtensions = map[string]struct{}{
+		".rpm":  {},
+		".deb":  {},
+		".udeb": {},
+	}
 	repoTypes = map[string]RepoType{
 		"rpm": {
 			MetadataPath: "repodata/repomd.xml",
@@ -252,13 +257,13 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 		}
 
 		data := repomd.Data
-		for i := 0; i < len(data); i++ {
+		for _, entry := range data {
 			if !r.quiet {
-				log.Println(data[i].Location.Href)
+				log.Println(entry.Location.Href)
 			}
 
-			metadataLocation := data[i].Location.Href
-			metadataChecksum := data[i].Checksum
+			metadataLocation := entry.Location.Href
+			metadataChecksum := entry.Checksum
 
 			decision := r.decide(metadataLocation, metadataChecksum, checksumMap)
 			switch decision {
@@ -279,7 +284,7 @@ func (r *Syncer) processMetadata(checksumMap map[string]XMLChecksum) (packagesTo
 				r.storage.Recycle(metadataLocation)
 			}
 
-			if data[i].Type == repoType.PackagesType {
+			if entry.Type == repoType.PackagesType {
 				packagesToDownload, packagesToRecycle, err = r.processPrimary(metadataLocation, checksumMap, repoType)
 			}
 		}
@@ -455,7 +460,9 @@ func (r *Syncer) processPrimary(path string, checksumMap map[string]XMLChecksum,
 		legacyPackage := (pack.Arch == "i586" || pack.Arch == "i686")
 
 		if SkipLegacy && legacyPackage {
-			fmt.Println("Skipping legacy package:", pack.Location.Href)
+			if !r.quiet {
+				fmt.Println("Skipping legacy package:", pack.Location.Href)
+			}
 			continue
 		}
 
