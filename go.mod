@@ -1,6 +1,6 @@
 module github.com/uyuni-project/minima
 
-go 1.24.1
+go 1.25.0
 
 require (
 	github.com/ProtonMail/go-crypto v1.1.6
@@ -18,8 +18,8 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
