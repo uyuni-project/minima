@@ -1,17 +1,18 @@
 package get
 
 import (
+	"context"
 	"crypto"
 	"errors"
 	"io"
 	"log"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/uyuni-project/minima/util"
 )
 
@@ -20,72 +21,74 @@ type S3Storage struct {
 	region string
 	bucket string
 	prefix string
-	svc    *s3.S3
+	client *s3.Client
 }
 
 // NewS3Storage returns a new Storage backed by an S3 bucket
 func NewS3Storage(accessKeyID string, secretAccessKey string, region string, bucket string) (storage Storage, err error) {
-	creds := credentials.NewStaticCredentials(accessKeyID, secretAccessKey, "")
-	config := aws.NewConfig().WithRegion(region).WithCredentials(creds)
-	svc := s3.New(session.New(), config)
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
+		awsconfig.WithRegion(region),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, "")),
+	)
+	if err != nil {
+		return
+	}
+	client := s3.NewFromConfig(cfg)
 
-	err = configureBucket(region, bucket, svc)
+	err = configureBucket(region, bucket, client)
 	if err != nil {
 		return
 	}
 
-	prefix, err := getCurrentPrefix(region, bucket, svc)
+	prefix, err := getCurrentPrefix(bucket, client)
 	if err != nil {
 		return
 	}
 
-	err = configureWebsite(region, bucket, prefix, svc)
+	err = configureWebsite(bucket, prefix, client)
 	if err != nil {
 		return
 	}
 
-	storage = &S3Storage{region, bucket, prefix, svc}
+	storage = &S3Storage{region, bucket, prefix, client}
 	return
 }
 
-func configureBucket(region string, bucket string, svc *s3.S3) error {
+func configureBucket(region string, bucket string, client *s3.Client) error {
 	input := &s3.CreateBucketInput{
 		Bucket: aws.String(bucket),
-		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			LocationConstraint: aws.String(region),
+		CreateBucketConfiguration: &types.CreateBucketConfiguration{
+			LocationConstraint: types.BucketLocationConstraint(region),
 		},
 	}
 	// HACK: https://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketPUT.html#RESTBucketPUT-requests-request-elements
 	if region == "us-east-1" {
 		input.CreateBucketConfiguration = nil
 	}
-	_, err := svc.CreateBucket(input)
+	_, err := client.CreateBucket(context.Background(), input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case s3.ErrCodeBucketAlreadyExists:
-				return errors.New("Bucket name already taken by another AWS user, please use a different name")
-			case s3.ErrCodeBucketAlreadyOwnedByYou:
-				return nil
-			default:
-				return err
-			}
-		} else {
-			return err
+		var bucketExists *types.BucketAlreadyExists
+		var bucketOwnedByYou *types.BucketAlreadyOwnedByYou
+		if errors.As(err, &bucketExists) {
+			return errors.New("Bucket name already taken by another AWS user, please use a different name")
 		}
+		if errors.As(err, &bucketOwnedByYou) {
+			return nil
+		}
+		return err
 	}
 	log.Printf("Bucket %s created\n", bucket)
 	return nil
 }
 
-func getCurrentPrefix(region string, bucket string, svc *s3.S3) (result string, err error) {
-	website, err := svc.GetBucketWebsite(&s3.GetBucketWebsiteInput{Bucket: aws.String(bucket)})
+func getCurrentPrefix(bucket string, client *s3.Client) (result string, err error) {
+	website, err := client.GetBucketWebsite(context.Background(), &s3.GetBucketWebsiteInput{
+		Bucket: aws.String(bucket),
+	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case "NoSuchWebsiteConfiguration":
-				return "", nil
-			}
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchWebsiteConfiguration" {
+			return "", nil
 		}
 		return
 	}
@@ -108,29 +111,26 @@ func getCurrentPrefix(region string, bucket string, svc *s3.S3) (result string, 
 	return
 }
 
-func configureWebsite(region string, bucket string, prefix string, svc *s3.S3) (err error) {
+func configureWebsite(bucket string, prefix string, client *s3.Client) (err error) {
 	input := &s3.PutBucketWebsiteInput{
 		Bucket: aws.String(bucket),
-		WebsiteConfiguration: &s3.WebsiteConfiguration{
-			IndexDocument: &s3.IndexDocument{
+		WebsiteConfiguration: &types.WebsiteConfiguration{
+			IndexDocument: &types.IndexDocument{
 				Suffix: aws.String("index.html"),
 			},
-			RoutingRules: []*s3.RoutingRule{
+			RoutingRules: []types.RoutingRule{
 				{
-					Condition: &s3.Condition{
+					Condition: &types.Condition{
 						KeyPrefixEquals: aws.String(prefix),
 					},
-					Redirect: &s3.Redirect{
+					Redirect: &types.Redirect{
 						ReplaceKeyPrefixWith: aws.String(""),
 					},
 				},
 			},
 		},
 	}
-	_, err = svc.PutBucketWebsite(input)
-	if err != nil {
-		return
-	}
+	_, err = client.PutBucketWebsite(context.Background(), input)
 	return
 }
 
@@ -155,13 +155,11 @@ func (s *S3Storage) NewReader(filename string, location Location) (reader io.Rea
 		Key:    aws.String(prefix + filename),
 	}
 
-	info, err := s.svc.GetObject(input)
+	info, err := s.client.GetObject(context.Background(), input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case "NotFound":
-				err = ErrFileNotFound
-			}
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchKey" {
+			err = ErrFileNotFound
 		}
 		return
 	}
@@ -172,13 +170,11 @@ func (s *S3Storage) NewReader(filename string, location Location) (reader io.Rea
 // StoringMapper returns a mapper that will store read data to a temporary location specified by filename
 func (s *S3Storage) StoringMapper(filename string, checksum string, hash crypto.Hash) (mapper util.ReaderMapper) {
 	return func(reader io.ReadCloser) (result io.ReadCloser, err error) {
-		uploader := s3manager.NewUploaderWithClient(s.svc)
-
 		pipeReader, pipeWriter := io.Pipe()
 
 		errs := make(chan error)
 		go func() {
-			_, err := uploader.Upload(&s3manager.UploadInput{
+			_, err := s.client.PutObject(context.Background(), &s3.PutObjectInput{
 				Bucket: aws.String(s.bucket),
 				Key:    aws.String(s.newPrefix() + filename),
 				Body:   pipeReader,
@@ -208,54 +204,45 @@ func (w *waitingCloser) Close() error {
 
 // Recycle will copy a file from the permanent to the temporary location
 func (s *S3Storage) Recycle(filename string) (err error) {
-	input := &s3.CopyObjectInput{
+	_, err = s.client.CopyObject(context.Background(), &s3.CopyObjectInput{
 		Bucket:     aws.String(s.bucket),
 		CopySource: aws.String(s.bucket + "/" + s.prefix + filename),
 		Key:        aws.String(s.newPrefix() + filename),
-	}
-
-	_, err = s.svc.CopyObject(input)
+	})
 	return
 }
 
 // Commit moves any temporary file accumulated so far to the permanent location
 func (s *S3Storage) Commit() (err error) {
 	newPrefix := s.newPrefix()
-	err = configureWebsite(s.region, s.bucket, newPrefix, s.svc)
+	err = configureWebsite(s.bucket, newPrefix, s.client)
 	if err != nil {
 		return
 	}
 
-	batcher := s3manager.NewBatchDeleteWithClient(s.svc)
-	objectsToDelete := true
-	for objectsToDelete {
-		input := &s3.ListObjectsV2Input{
-			Bucket: aws.String(s.bucket),
-			Prefix: aws.String(s.prefix),
-		}
-
-		objects, err := s.svc.ListObjectsV2(input)
+	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.bucket),
+		Prefix: aws.String(s.prefix),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.Background())
 		if err != nil {
 			return err
 		}
+		if len(page.Contents) == 0 {
+			break
+		}
 
-		if len(objects.Contents) > 0 {
-			toDelete := []s3manager.BatchDeleteObject{}
-			for _, o := range objects.Contents {
-				toDelete = append(toDelete, s3manager.BatchDeleteObject{Object: &s3.DeleteObjectInput{
-					Key:    o.Key,
-					Bucket: aws.String(s.bucket),
-				}})
-			}
-
-			err := batcher.Delete(nil, &s3manager.DeleteObjectsIterator{
-				Objects: toDelete,
-			})
-			if err != nil {
-				return err
-			}
-		} else {
-			objectsToDelete = false
+		ids := make([]types.ObjectIdentifier, len(page.Contents))
+		for i, o := range page.Contents {
+			ids[i] = types.ObjectIdentifier{Key: o.Key}
+		}
+		_, err = s.client.DeleteObjects(context.Background(), &s3.DeleteObjectsInput{
+			Bucket: aws.String(s.bucket),
+			Delete: &types.Delete{Objects: ids},
+		})
+		if err != nil {
+			return err
 		}
 	}
 
