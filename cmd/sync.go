@@ -135,7 +135,7 @@ func syncersFromConfig(configString string, quiet bool) ([]*get.Syncer, error) {
 		case "file":
 			storage = get.NewFileStorage(filepath.Join(config.Storage.Path, filepath.FromSlash(repoURL.Path)))
 		case "s3":
-			storage, err = get.NewS3Storage(config.Storage.AccessKeyID, config.Storage.AccessKeyID, config.Storage.Region, config.Storage.Bucket+repoURL.Path)
+			storage, err = get.NewS3Storage(config.Storage.AccessKeyID, config.Storage.SecretAccessKey, config.Storage.Region, config.Storage.Bucket+repoURL.Path)
 			if err != nil {
 				return nil, err
 			}
