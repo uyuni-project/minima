@@ -235,56 +235,43 @@ func ArchMage(client *http.Client, repo *get.HTTPRepoConfig) error {
 }
 
 // GetRepo retrieves HTTP repositories data for all the products targets associated to an MU
-func GetRepo(client *http.Client, mu string) (httpFormattedRepos []get.HTTPRepoConfig, err error) {
+func GetRepo(client *http.Client, mu string) ([]get.HTTPRepoConfig, error) {
 	productsChunks, err := getProductsForMU(client, mu)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving products for MU %s: %v", mu, err)
 	}
 	fmt.Printf("%d product entries for mu %s\n", len(productsChunks), mu)
 
-	reposChan := make(chan []get.HTTPRepoConfig)
-	errChan := make(chan error)
-	// empty struct for 0 allocation: we need only to signal we're done, not pass data
-	doneChan := make(chan struct{})
+	n := len(productsChunks)
+	reposChan := make(chan []get.HTTPRepoConfig, n)
+	errChan := make(chan error, n)
 
-	// we need a dedicated goroutine to start the others, wait for them to finish
-	// and signal back that we're done processing
-	go func() {
-		var wg sync.WaitGroup
-		wg.Add(len(productsChunks))
-
-		// process each chunk (possibly) in parallel
-		for _, productChunk := range productsChunks {
-			go func(product, maint string) {
-				defer wg.Done()
-
-				repo, err := ProcWebChunk(client, product, maint)
-				if err != nil {
-					errChan <- err
-				}
-				reposChan <- repo
-
-			}(productChunk, mu)
-		}
-
-		wg.Wait()
-		close(reposChan)
-		doneChan <- struct{}{}
-	}()
-
-	// keeps looping untill we're done processing all chunks or an error occurs
-	for {
-		select {
-		case repo := <-reposChan:
-			httpFormattedRepos = append(httpFormattedRepos, repo...)
-		case err = <-errChan:
-			return nil, err
-		case <-doneChan:
-			close(errChan)
-			close(doneChan)
-			return httpFormattedRepos, nil
-		}
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for _, productChunk := range productsChunks {
+		go func(product, maint string) {
+			defer wg.Done()
+			repo, err := ProcWebChunk(client, product, maint)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			reposChan <- repo
+		}(productChunk, mu)
 	}
+	wg.Wait()
+	close(reposChan)
+	close(errChan)
+
+	if err := <-errChan; err != nil {
+		return nil, err
+	}
+
+	var httpFormattedRepos []get.HTTPRepoConfig
+	for repo := range reposChan {
+		httpFormattedRepos = append(httpFormattedRepos, repo...)
+	}
+	return httpFormattedRepos, nil
 }
 
 // getProductsForMU parses a MU webpage attempting to retrieve a slice of available SUSE products
