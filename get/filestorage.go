@@ -3,7 +3,6 @@ package get
 import (
 	"crypto"
 	"io"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -39,7 +38,7 @@ func (s *FileStorage) NewReader(filename string, location Location) (reader io.R
 
 	f, err := os.Open(fullPath)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return f, err
