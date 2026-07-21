@@ -3,14 +3,13 @@ package util
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 )
 
 func TestCompose(t *testing.T) {
 	helloWorldReader := NewNopReadCloser(bytes.NewBufferString("Hello, World"))
 	bangMapper := func(r io.ReadCloser) (result io.ReadCloser, err error) {
-		raw, err := ioutil.ReadAll(r)
+		raw, err := io.ReadAll(r)
 		if err != nil {
 			t.Error(err)
 		}
@@ -19,7 +18,7 @@ func TestCompose(t *testing.T) {
 	}
 
 	composedReaderFunction := Compose(bangMapper, func(reader io.ReadCloser) (err error) {
-		result, err := ioutil.ReadAll(reader)
+		result, err := io.ReadAll(reader)
 		if err != nil {
 			t.Error(err)
 		}
