@@ -77,18 +77,18 @@ func init() {
 }
 
 func muFindAndSync(quiet bool) {
-	config := Config{}
 	updateList := []Updates{}
 
-	err := yaml.Unmarshal([]byte(cfgString), &config)
+	config, err := parseConfig(cfgString)
 	if err != nil {
-		log.Fatalf("Error reading configuration: %v", err)
+		log.Fatal(err)
 	}
+	timeoutMinutes := time.Duration(config.TimeoutMinutes) * time.Minute
 
 	if cleanup {
 		// DO CLEANUP - TO BE IMPLEMENTED
 		log.Println("searching for outdated MU repos...")
-		updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, true)
+		updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, timeoutMinutes, true)
 		if err != nil {
 			log.Fatalf("Error searching for outdated MUs repos: %v", err)
 		}
@@ -99,7 +99,7 @@ func muFindAndSync(quiet bool) {
 		log.Println("...done!")
 	} else {
 		if thisMU == "" {
-			updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, justSearch)
+			updateList, err = GetUpdatesAndChannels(config.OBS.Username, config.OBS.Password, timeoutMinutes, justSearch)
 			if err != nil {
 				log.Fatalf("Error finding updates and channels: %v", err)
 			}
@@ -320,8 +320,8 @@ func cleanWebChunks(chunks []string) []string {
 	return products
 }
 
-func GetUpdatesAndChannels(usr, passwd string, justsearch bool) (updlist []Updates, err error) {
-	client := updates.NewClient(usr, passwd)
+func GetUpdatesAndChannels(usr, passwd string, timeout time.Duration, justsearch bool) (updlist []Updates, err error) {
+	client := updates.NewClient(usr, passwd, timeout)
 	rrs, err := client.GetReleaseRequests("qam-manager", "new,review")
 	if err != nil {
 		return updlist, fmt.Errorf("error while getting response from obs: %v", err)

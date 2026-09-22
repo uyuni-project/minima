@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type OBS struct {
@@ -79,12 +80,14 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	return resp, err
 }
 
-func NewClient(username string, password string) *Client {
+func NewClient(username string, password string, timeout time.Duration) *Client {
 	return &Client{
-		BaseURL:    &url.URL{Host: baseUrl, Scheme: "https"},
-		Username:   username,
-		Password:   password,
-		HttpClient: &http.Client{},
+		BaseURL:  &url.URL{Host: baseUrl, Scheme: "https"},
+		Username: username,
+		Password: password,
+		HttpClient: &http.Client{
+			Timeout: timeout,
+		},
 	}
 }
 
