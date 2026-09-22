@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -119,6 +120,59 @@ func TestStoreRepoZstd(t *testing.T) {
 
 	// second sync
 	err = syncer.StoreRepo()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStoreRepoRetriesTransientStatusCode(t *testing.T) {
+	// Serve a 504 for the first two requests, then the content of testdata
+	served := http.StripPrefix("/flaky/", http.FileServer(http.Dir("testdata")))
+	var mutex sync.Mutex
+	transientFailures := 0
+	failuresServed := func() int {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return transientFailures
+	}
+	http.HandleFunc("/flaky/", func(w http.ResponseWriter, r *http.Request) {
+		mutex.Lock()
+		if transientFailures < 2 {
+			transientFailures++
+			mutex.Unlock()
+			w.WriteHeader(http.StatusGatewayTimeout)
+			return
+		}
+		mutex.Unlock()
+		served.ServeHTTP(w, r)
+	})
+
+	directory := filepath.Join(os.TempDir(), "syncer_test_retry")
+	err := os.RemoveAll(directory)
+	if err != nil {
+		t.Error(err)
+	}
+
+	archs := map[string]bool{
+		"x86_64": true,
+	}
+	storage := NewFileStorage(directory)
+	url, err := url.Parse("http://localhost:8080/flaky/repo")
+	if err != nil {
+		t.Error(err)
+	}
+	syncer := NewSyncer(*url, archs, storage, false)
+
+	err = syncer.StoreRepo()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if failuresServed() != 2 {
+		t.Error("expected the two transient failures to be served, got", failuresServed())
+	}
+
+	_, err = os.Stat(filepath.Join(directory, "repodata", "repomd.xml"))
 	if err != nil {
 		t.Error(err)
 	}
