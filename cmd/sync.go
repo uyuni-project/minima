@@ -55,7 +55,7 @@ var (
 			initConfig()
 			quiet, _ := cmd.Flags().GetBool("quiet")
 
-			syncers, err := syncersFromConfig(cfgString)
+			syncers, err := syncersFromConfig(cfgString, quiet)
 			if err != nil {
 				log.Fatal(err)
 			}
