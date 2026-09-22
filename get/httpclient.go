@@ -24,6 +24,7 @@ func ReadURL(url string) (r io.ReadCloser, err error) {
 	}
 
 	if response.StatusCode != 200 {
+		response.Body.Close()
 		err = &UnexpectedStatusCodeError{url, response.StatusCode}
 		return
 	}
