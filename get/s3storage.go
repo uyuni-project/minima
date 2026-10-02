@@ -67,12 +67,10 @@ func configureBucket(region string, bucket string, client *s3.Client) error {
 	}
 	_, err := client.CreateBucket(context.Background(), input)
 	if err != nil {
-		var bucketExists *types.BucketAlreadyExists
-		var bucketOwnedByYou *types.BucketAlreadyOwnedByYou
-		if errors.As(err, &bucketExists) {
+		if _, ok := errors.AsType[*types.BucketAlreadyExists](err); ok {
 			return errors.New("Bucket name already taken by another AWS user, please use a different name")
 		}
-		if errors.As(err, &bucketOwnedByYou) {
+		if _, ok := errors.AsType[*types.BucketAlreadyOwnedByYou](err); ok {
 			return nil
 		}
 		return err
@@ -86,8 +84,7 @@ func getCurrentPrefix(bucket string, client *s3.Client) (result string, err erro
 		Bucket: aws.String(bucket),
 	})
 	if err != nil {
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchWebsiteConfiguration" {
+		if apiErr, ok := errors.AsType[smithy.APIError](err); ok && apiErr.ErrorCode() == "NoSuchWebsiteConfiguration" {
 			return "", nil
 		}
 		return
@@ -157,8 +154,7 @@ func (s *S3Storage) NewReader(filename string, location Location) (reader io.Rea
 
 	info, err := s.client.GetObject(context.Background(), input)
 	if err != nil {
-		var apiErr smithy.APIError
-		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchKey" {
+		if apiErr, ok := errors.AsType[smithy.APIError](err); ok && apiErr.ErrorCode() == "NoSuchKey" {
 			err = ErrFileNotFound
 		}
 		return

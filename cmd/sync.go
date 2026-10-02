@@ -86,8 +86,6 @@ func syncersFromConfig(configString string, quiet bool) ([]*get.Syncer, error) {
 	if err != nil {
 		return nil, err
 	}
-	// passing the flag value to a global variable in get package, to disables syncing of i586 and i686 rpms (usually inside x86_64)
-	get.SkipLegacy = skipLegacyPackages
 	// Go's default timeout for HTTP clients is 0, meaning there's no timeout
 	// this can lead to connections hanging indefinitely
 	http.DefaultClient.Timeout = time.Duration(config.TimeoutMinutes) * time.Minute
@@ -134,7 +132,7 @@ func syncersFromConfig(configString string, quiet bool) ([]*get.Syncer, error) {
 				return nil, err
 			}
 		}
-		syncers = append(syncers, get.NewSyncer(*repoURL, archs, storage, quiet))
+		syncers = append(syncers, get.NewSyncer(*repoURL, archs, storage, quiet, skipLegacyPackages))
 	}
 
 	return syncers, nil

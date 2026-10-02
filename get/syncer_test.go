@@ -27,7 +27,7 @@ func TestStoreRepo(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	syncer := NewSyncer(*url, archs, storage, false)
+	syncer := NewSyncer(*url, archs, storage, false, false)
 
 	// first sync
 	err = syncer.StoreRepo()
@@ -84,7 +84,7 @@ func TestStoreRepoZstd(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	syncer := NewSyncer(*url, archs, storage, false)
+	syncer := NewSyncer(*url, archs, storage, false, false)
 
 	// first sync
 	err = syncer.StoreRepo()
@@ -161,7 +161,7 @@ func TestStoreRepoRetriesTransientStatusCode(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	syncer := NewSyncer(*url, archs, storage, false)
+	syncer := NewSyncer(*url, archs, storage, false, false)
 
 	err = syncer.StoreRepo()
 	if err != nil {
@@ -194,7 +194,7 @@ func TestStoreDebRepo(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	syncer := NewSyncer(*url, archs, storage, false)
+	syncer := NewSyncer(*url, archs, storage, false, false)
 
 	// first sync
 	err = syncer.StoreRepo()

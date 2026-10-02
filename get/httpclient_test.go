@@ -2,7 +2,7 @@ package get
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 )
@@ -19,7 +19,7 @@ func TestReadURL(t *testing.T) {
 		t.Error(err)
 	}
 
-	result, err := ioutil.ReadAll(reader)
+	result, err := io.ReadAll(reader)
 	if err != nil {
 		t.Error(err)
 	}

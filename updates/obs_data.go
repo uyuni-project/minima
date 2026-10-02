@@ -71,14 +71,14 @@ type State struct {
 	Comment string `xml:"comment"`
 }
 type Review struct {
-	State      string `xml:"state,attr"`
-	By_user    string `xml:"by_user,attr"`
-	By_group   string `xml:"by_group,attr"`
-	By_project string `xml:"by_project,attr"`
-	By_package string `xml:"by_package,attr"`
-	Who        string `xml:"who,attr"`
-	When       string `xml:"when,attr"`
-	Comment    string `xml:"comment"`
+	State     string `xml:"state,attr"`
+	ByUser    string `xml:"by_user,attr"`
+	ByGroup   string `xml:"by_group,attr"`
+	ByProject string `xml:"by_project,attr"`
+	ByPackage string `xml:"by_package,attr"`
+	Who       string `xml:"who,attr"`
+	When      string `xml:"when,attr"`
+	Comment   string `xml:"comment"`
 }
 type History struct {
 	Who         string `xml:"who,attr"`
@@ -96,7 +96,7 @@ type ReleaseRequest struct {
 	Reviews     []Review  `xml:"review"`       //zeroOrMore
 	Histories   []History `xml:"history"`      //zeroOrMore
 	Title       string    `xml:"title"`        //optional
-	Accept_at   string    `xml:"accept_at"`    //optional
+	AcceptAt    string    `xml:"accept_at"`    //optional
 }
 type Collection struct {
 	Matches         string           `xml:"matches,attr"`
