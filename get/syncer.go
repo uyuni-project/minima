@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/klauspost/compress/zstd"
@@ -71,13 +74,13 @@ const repomdPath = "repodata/repomd.xml"
 const releasePath = "Release"
 
 type RepoType struct {
-	MetadataPath              string
-	PackagesType              string
-	DecodeMetadata            func(io.Reader) (XMLRepomd, error)
-	DecodePackages            func(io.Reader, string) (XMLMetaData, error)
-	MetadataSignatureExt      string
-	Noarch                    string
-	AdditionalMetadataPaths   []string
+	MetadataPath            string
+	PackagesType            string
+	DecodeMetadata          func(io.Reader) (XMLRepomd, error)
+	DecodePackages          func(io.Reader, string) (XMLMetaData, error)
+	MetadataSignatureExt    string
+	Noarch                  string
+	AdditionalMetadataPaths []string
 }
 
 var (
@@ -145,6 +148,15 @@ func (r *Syncer) StoreRepo() (err error) {
 		err = r.storeRepo(checksumMap)
 		if err == nil {
 			return
+		}
+
+		netOpErr, ok := err.(*net.OpError)
+		if ok {
+			syscallErr, ok := netOpErr.Err.(*os.SyscallError)
+			if ok && syscallErr.Err == syscall.ECONNRESET {
+				log.Printf("Connection reset: %v. Retrying ...\n", netOpErr)
+				continue
+			}
 		}
 
 		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)

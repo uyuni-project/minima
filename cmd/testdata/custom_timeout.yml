@@ -1,0 +1,5 @@
+storage:
+  type: file
+  path: /srv/mirror
+
+timeout_minutes: 10
