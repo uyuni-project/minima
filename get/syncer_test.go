@@ -1,6 +1,7 @@
 package get
 
 import (
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -173,6 +174,47 @@ func TestStoreRepoRetriesTransientStatusCode(t *testing.T) {
 	}
 
 	_, err = os.Stat(filepath.Join(directory, "repodata", "repomd.xml"))
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStoreRepoRetriesConnectionReset(t *testing.T) {
+	// Reset the first two connections (repomd.xml, then the Release fallback), then serve testdata
+	served := http.StripPrefix("/reset/", http.FileServer(http.Dir("testdata")))
+	var mutex sync.Mutex
+	resets := 0
+	http.HandleFunc("/reset/", func(w http.ResponseWriter, r *http.Request) {
+		mutex.Lock()
+		if resets < 2 {
+			resets++
+			mutex.Unlock()
+			conn, _, err := http.NewResponseController(w).Hijack()
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			conn.(*net.TCPConn).SetLinger(0) // close with RST
+			conn.Close()
+			return
+		}
+		mutex.Unlock()
+		served.ServeHTTP(w, r)
+	})
+
+	directory := filepath.Join(os.TempDir(), "syncer_test_reset")
+	err := os.RemoveAll(directory)
+	if err != nil {
+		t.Error(err)
+	}
+
+	url, err := url.Parse("http://localhost:8080/reset/repo")
+	if err != nil {
+		t.Error(err)
+	}
+	syncer := NewSyncer(*url, map[string]bool{"x86_64": true}, NewFileStorage(directory), false, false)
+
+	err = syncer.StoreRepo()
 	if err != nil {
 		t.Error(err)
 	}

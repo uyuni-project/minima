@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"sort"
 	"testing"
+	"testing/synctest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/uyuni-project/minima/get"
@@ -272,21 +273,24 @@ func TestGetRepo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := createMockClient(tt.mu, tt.validArchs, tt.netWorkErr)
+			// the bubble fails the test if GetRepo leaves goroutines blocked behind
+			synctest.Test(t, func(t *testing.T) {
+				client := createMockClient(tt.mu, tt.validArchs, tt.netWorkErr)
 
-			got, err := GetRepo(client, tt.mu)
-			assert.EqualValues(t, tt.wantErr, (err != nil))
-			assert.Equal(t, len(tt.want), len(got))
+				got, err := GetRepo(client, tt.mu)
+				assert.EqualValues(t, tt.wantErr, (err != nil))
+				assert.Equal(t, len(tt.want), len(got))
 
-			// to reliably compare expected and got  we need to sort the repos by URL,
-			// the results' starting order is influenced by goroutines scheduling
-			sort.Slice(got, func(i, j int) bool { return got[i].URL < got[j].URL })
-			for i := range tt.want {
-				wantRepo := tt.want[i]
-				gotRepo := got[i]
-				assert.Equal(t, wantRepo.URL, gotRepo.URL)
-				assert.ElementsMatch(t, wantRepo.Archs, gotRepo.Archs)
-			}
+				// to reliably compare expected and got  we need to sort the repos by URL,
+				// the results' starting order is influenced by goroutines scheduling
+				sort.Slice(got, func(i, j int) bool { return got[i].URL < got[j].URL })
+				for i := range tt.want {
+					wantRepo := tt.want[i]
+					gotRepo := got[i]
+					assert.Equal(t, wantRepo.URL, gotRepo.URL)
+					assert.ElementsMatch(t, wantRepo.Archs, gotRepo.Archs)
+				}
+			})
 		})
 	}
 }
