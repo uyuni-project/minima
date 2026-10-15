@@ -114,6 +114,8 @@ func getHTTPConfig(name, description, url string, sccEntries sccMap) (HTTPRepoCo
 	return httpConfig, false
 }
 
+var nextLinkRegexp = regexp.MustCompile(`<([^>]+)>; rel="next"`)
+
 func downloadPaged(url string, token string) (page []byte, next string, err error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -126,6 +128,7 @@ func downloadPaged(url string, token string) (page []byte, next string, err erro
 	if err != nil {
 		return
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		err = &UnexpectedStatusCodeError{url, resp.StatusCode}
@@ -137,8 +140,7 @@ func downloadPaged(url string, token string) (page []byte, next string, err erro
 		return
 	}
 
-	re := regexp.MustCompile("<([^>]+)>; rel=\"next\"")
-	matches := re.FindStringSubmatch(resp.Header["Link"][0])
+	matches := nextLinkRegexp.FindStringSubmatch(resp.Header.Get("Link"))
 	if matches != nil {
 		next = matches[1]
 	}

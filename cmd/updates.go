@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -191,42 +192,28 @@ func ProcWebChunk(client *http.Client, product, maint string) ([]get.HTTPRepoCon
 
 // ArchMage checks that all architecture slice of a *HTTPRepoConfig is filled right
 func ArchMage(client *http.Client, repo *get.HTTPRepoConfig) error {
-	archsChan := make(chan string)
-	// we need a dedicated goroutine to start the others, wait for them to finish
-	// and signal back that we're done doing HTTP calls
-	go func() {
-		var wg sync.WaitGroup
-		wg.Add(len(architectures))
-
-		// verify each arch page exists (possibly) in parallel
-		for _, a := range architectures {
-			go func(arch string) {
-				defer wg.Done()
-
-				if strings.Contains(repo.URL, arch) {
-					archsChan <- arch
-					return
-				}
-
+	var mutex sync.Mutex
+	var wg sync.WaitGroup
+	// verify each arch page exists (possibly) in parallel
+	for _, arch := range architectures {
+		wg.Go(func() {
+			if !strings.Contains(repo.URL, arch) {
 				finalUrl := repo.URL + arch + "/"
 				exists, err := updates.CheckWebPageExists(client, finalUrl)
 				if err != nil {
 					// TODO: verify if we need to actually return an error
 					log.Printf("Got error calling HEAD %s: %v...\n", finalUrl, err)
 				}
-				if exists {
-					archsChan <- arch
+				if !exists {
+					return
 				}
-			}(a)
-		}
-
-		wg.Wait()
-		close(archsChan)
-	}()
-
-	for foundArch := range archsChan {
-		repo.Archs = append(repo.Archs, foundArch)
+			}
+			mutex.Lock()
+			defer mutex.Unlock()
+			repo.Archs = append(repo.Archs, arch)
+		})
 	}
+	wg.Wait()
 
 	if len(repo.Archs) == 0 {
 		return fmt.Errorf("no available arch has been found for this repo: %s", repo.URL)
@@ -242,34 +229,26 @@ func GetRepo(client *http.Client, mu string) ([]get.HTTPRepoConfig, error) {
 	}
 	fmt.Printf("%d product entries for mu %s\n", len(productsChunks), mu)
 
-	n := len(productsChunks)
-	reposChan := make(chan []get.HTTPRepoConfig, n)
-	errChan := make(chan error, n)
-
+	var httpFormattedRepos []get.HTTPRepoConfig
+	var mutex sync.Mutex
 	var wg sync.WaitGroup
-	wg.Add(n)
-	for _, productChunk := range productsChunks {
-		go func(product, maint string) {
-			defer wg.Done()
-			repo, err := ProcWebChunk(client, product, maint)
-			if err != nil {
-				errChan <- err
+	// process each chunk (possibly) in parallel
+	for _, product := range productsChunks {
+		wg.Go(func() {
+			repo, chunkErr := ProcWebChunk(client, product, mu)
+			mutex.Lock()
+			defer mutex.Unlock()
+			if chunkErr != nil {
+				err = errors.Join(err, chunkErr)
 				return
 			}
-			reposChan <- repo
-		}(productChunk, mu)
+			httpFormattedRepos = append(httpFormattedRepos, repo...)
+		})
 	}
 	wg.Wait()
-	close(reposChan)
-	close(errChan)
 
-	if err := <-errChan; err != nil {
+	if err != nil {
 		return nil, err
-	}
-
-	var httpFormattedRepos []get.HTTPRepoConfig
-	for repo := range reposChan {
-		httpFormattedRepos = append(httpFormattedRepos, repo...)
 	}
 	return httpFormattedRepos, nil
 }
@@ -318,9 +297,9 @@ func GetUpdatesAndChannels(usr, passwd string, timeout time.Duration, justsearch
 		var update Updates
 		update.ReleaseRequest = value.Id
 
-		for i := 0; i < len(value.Actions); i++ {
-			if len(strings.Split(value.Actions[i].Target.Package, ".")) > 1 {
-				update.IncidentNumber = strings.Split(value.Actions[i].Target.Package, ".")[1]
+		for _, action := range value.Actions {
+			if _, after, found := strings.Cut(action.Target.Package, "."); found {
+				update.IncidentNumber, _, _ = strings.Cut(after, ".")
 				if update.IncidentNumber != "" {
 					break
 				}
@@ -328,7 +307,8 @@ func GetUpdatesAndChannels(usr, passwd string, timeout time.Duration, justsearch
 		}
 		for _, val := range value.Actions {
 			if !strings.Contains(val.Target.Package, "patchinfo") && !(strings.Contains(val.Target.Package, "SLE") || strings.Contains(val.Target.Package, "Module")) {
-				update.SRCRPMS = append(update.SRCRPMS, strings.Split(val.Target.Package, ".")[0])
+				pkg, _, _ := strings.Cut(val.Target.Package, ".")
+				update.SRCRPMS = append(update.SRCRPMS, pkg)
 			}
 		}
 		if !justsearch {

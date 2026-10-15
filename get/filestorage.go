@@ -2,9 +2,11 @@ package get
 
 import (
 	"crypto"
+	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/uyuni-project/minima/util"
@@ -29,27 +31,29 @@ func (s *FileStorage) NewReader(filename string, location Location) (reader io.R
 	} else {
 		prefix = "-in-progress"
 	}
-	fullPath := path.Join(s.directory+prefix, filename)
-	stat, err := os.Stat(fullPath)
-	if os.IsNotExist(err) || stat == nil {
-		err = ErrFileNotFound
+	fullPath, err := localPath(s.directory+prefix, filename)
+	if err != nil {
 		return
 	}
-
 	f, err := os.Open(fullPath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, ErrFileNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
-
-	return f, err
+	return f, nil
 }
 
 // StoringMapper returns a mapper that will store read data to a temporary location specified by filename
 func (s *FileStorage) StoringMapper(filename string, checksum string, hash crypto.Hash) util.ReaderMapper {
 	return func(reader io.ReadCloser) (result io.ReadCloser, err error) {
-		fullPath := path.Join(s.directory+"-in-progress", filename)
+		fullPath, err := localPath(s.directory+"-in-progress", filename)
+		if err != nil {
+			return
+		}
 		// attempt to create any missing directories in the full path
-		err = os.MkdirAll(path.Dir(fullPath), os.ModePerm)
+		err = os.MkdirAll(filepath.Dir(fullPath), os.ModePerm)
 		if err != nil {
 			return
 		}
@@ -66,14 +70,17 @@ func (s *FileStorage) StoringMapper(filename string, checksum string, hash crypt
 
 // Recycle will copy a file from the permanent to the temporary location
 func (s *FileStorage) Recycle(filename string) (err error) {
-	newPath := path.Join(s.directory+"-in-progress", filename)
-	err = os.MkdirAll(path.Dir(newPath), os.ModePerm)
+	newPath, err := localPath(s.directory+"-in-progress", filename)
+	if err != nil {
+		return
+	}
+	err = os.MkdirAll(filepath.Dir(newPath), os.ModePerm)
 	if err != nil {
 		return
 	}
 
-	err = os.Link(path.Join(s.directory, filename), newPath)
-	if err != nil && os.IsExist(err) {
+	err = os.Link(filepath.Join(s.directory, filename), newPath)
+	if errors.Is(err, fs.ErrExist) {
 		// ignore, we are fine already
 		return nil
 	}
@@ -91,7 +98,7 @@ func (s *FileStorage) Commit() error {
 	if hasPackages(tmpDir) {
 		os.RemoveAll(oldDir)
 
-		if err := os.Rename(s.directory, oldDir); err != nil && !os.IsNotExist(err) {
+		if err := os.Rename(s.directory, oldDir); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
 		if err := os.Rename(tmpDir, s.directory); err != nil {
@@ -106,6 +113,14 @@ func (s *FileStorage) Commit() error {
 		return err
 	}
 	return os.RemoveAll(tmpDir)
+}
+
+// localPath joins filename to dir, rejecting names (which come from remote metadata) that would escape dir
+func localPath(dir, filename string) (string, error) {
+	if !filepath.IsLocal(filename) {
+		return "", fmt.Errorf("refusing unsafe path %q", filename)
+	}
+	return filepath.Join(dir, filename), nil
 }
 
 func hasPackages(dir string) bool {

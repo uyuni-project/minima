@@ -24,7 +24,6 @@ func TestSCCToHTTPConfigs(t *testing.T) {
 	})
 
 	http.HandleFunc("/connect/organizations/repositories2", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Link", "")
 		fmt.Fprintf(w, "[{\"url\" : \"http://whatever/SLES15-SP5-Updates\", \"name\" : \"SLES15-SP5-Updates\", \"description\" : \"x86_64 aarch64 s390x ppc64le\"}]")
 	})
 
