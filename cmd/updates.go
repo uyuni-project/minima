@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -225,7 +226,7 @@ func ArchMage(client *http.Client, repo *get.HTTPRepoConfig) error {
 func GetRepo(client *http.Client, mu string) ([]get.HTTPRepoConfig, error) {
 	productsChunks, err := getProductsForMU(client, mu)
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving products for MU %s: %v", mu, err)
+		return nil, fmt.Errorf("error retrieving products for MU %s: %w", mu, err)
 	}
 	fmt.Printf("%d product entries for mu %s\n", len(productsChunks), mu)
 
@@ -290,7 +291,7 @@ func GetUpdatesAndChannels(usr, passwd string, timeout time.Duration, justsearch
 	client := updates.NewClient(usr, passwd, timeout)
 	rrs, err := client.GetReleaseRequests("qam-manager", "new,review")
 	if err != nil {
-		return updlist, fmt.Errorf("error while getting response from obs: %v", err)
+		return updlist, fmt.Errorf("error while getting response from obs: %w", err)
 	}
 
 	for _, value := range rrs {
@@ -315,7 +316,7 @@ func GetUpdatesAndChannels(usr, passwd string, timeout time.Duration, justsearch
 			mu := fmt.Sprintf("%s%s/", updates.DownloadIbsLink, update.IncidentNumber)
 			update.Repositories, err = GetRepo(client.HttpClient, mu)
 			if err != nil {
-				return updlist, fmt.Errorf("something went wrong in repo processing: %v", err)
+				return updlist, fmt.Errorf("something went wrong in repo processing: %w", err)
 			}
 		}
 		updlist = append(updlist, update)
@@ -323,24 +324,32 @@ func GetUpdatesAndChannels(usr, passwd string, timeout time.Duration, justsearch
 	return updlist, err
 }
 
+var muIDRegEx = regexp.MustCompile(`/\d{5,6}/`)
+
 func RemoveOldChannels(config Config, updates []Updates) (err error) {
 	mappedUpdates := MakeAMap(updates)
 	switch config.Storage.Type {
 	case "file":
 		var muChannelList []string
-		err = filepath.Walk(filepath.Join(config.Storage.Path, "ibs/SUSE:/Maintenance:/"), func(path string, info os.FileInfo, err error) error {
-			if info.IsDir() {
+		err = filepath.WalkDir(filepath.Join(config.Storage.Path, "ibs/SUSE:/Maintenance:/"), func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
 				muChannelList = append(muChannelList, path)
 			}
 			return nil
 		})
+		if errors.Is(err, fs.ErrNotExist) {
+			// nothing synced yet, nothing to remove
+			return nil
+		}
 		if err != nil {
 			return
 		}
-		//templ := regexp.MustCompile(`/\d{5,6}/`)
 		for _, elem := range muChannelList {
-			if regexp.MustCompile(`/\d{5,6}/`).FindString(elem) != "" {
-				_, exists := mappedUpdates[strings.Replace(regexp.MustCompile(`/\d{5,6}/`).FindString(elem), "/", "", 10)]
+			if m := muIDRegEx.FindString(elem); m != "" {
+				_, exists := mappedUpdates[strings.ReplaceAll(m, "/", "")]
 				if !exists {
 					log.Printf("removing: %s...\n", elem)
 					err = os.RemoveAll(elem)
