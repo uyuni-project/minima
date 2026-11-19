@@ -1,8 +1,13 @@
 name: release
+
 on:
   push:
     tags:
       - 'v*'
+
+permissions:
+  contents: write # goreleaser creates the GitHub release and uploads assets
+
 jobs:
   release:
     runs-on: ubuntu-latest
