@@ -20,6 +20,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 	"testing/synctest"
@@ -293,4 +295,20 @@ func TestGetRepo(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestRemoveOldChannels(t *testing.T) {
+	dir := t.TempDir()
+	config := Config{Storage: get.StorageConfig{Type: "file", Path: dir}}
+
+	// nothing synced yet: must not panic or fail
+	assert.NoError(t, RemoveOldChannels(config, nil))
+
+	mu := filepath.Join(dir, "ibs/SUSE:/Maintenance:/")
+	for _, id := range []string{"12345", "99999"} {
+		assert.NoError(t, os.MkdirAll(filepath.Join(mu, id, "SUSE_Updates"), 0755))
+	}
+	assert.NoError(t, RemoveOldChannels(config, []Updates{{IncidentNumber: "12345"}}))
+	assert.DirExists(t, filepath.Join(mu, "12345", "SUSE_Updates"))
+	assert.NoDirExists(t, filepath.Join(mu, "99999", "SUSE_Updates"))
 }
