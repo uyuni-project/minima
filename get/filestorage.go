@@ -126,11 +126,11 @@ func localPath(dir, filename string) (string, error) {
 func hasPackages(dir string) bool {
 	found := false
 	// We check for common package extensions used in Linux distros
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		if !info.IsDir() {
+		if !d.IsDir() {
 			ext := filepath.Ext(path)
 			if _, check := packageExtensions[ext]; check {
 				found = true
