@@ -242,10 +242,8 @@ func GetRepo(client *http.Client, mu string) ([]get.HTTPRepoConfig, error) {
 	}
 	fmt.Printf("%d product entries for mu %s\n", len(productsChunks), mu)
 
-	n := len(productsChunks)
-	reposChan := make(chan []get.HTTPRepoConfig, n)
-	errChan := make(chan error, n)
-
+	var httpFormattedRepos []get.HTTPRepoConfig
+	var mutex sync.Mutex
 	var wg sync.WaitGroup
 	wg.Add(n)
 	for _, productChunk := range productsChunks {
