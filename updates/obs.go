@@ -16,7 +16,7 @@ type OBS struct {
 	Password string
 }
 
-func (c *Client) NewRequest(method, path string, body interface{}) (*http.Request, error) {
+func (c *Client) NewRequest(method, path string, body any) (*http.Request, error) {
 	rel := &url.URL{Path: path}
 	u := c.BaseURL.ResolveReference(rel)
 	var buf io.ReadWriter
@@ -67,7 +67,7 @@ func (c *Client) GetPatchinfo(rr ReleaseRequest) (*Patchinfo, error) {
 	return &patchinfo, err
 }
 
-func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
+func (c *Client) do(req *http.Request, v any) (*http.Response, error) {
 	resp, err := c.HttpClient.Do(req)
 	if err != nil {
 		return nil, err

@@ -20,8 +20,11 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"testing"
+	"testing/synctest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/uyuni-project/minima/get"
@@ -272,21 +275,40 @@ func TestGetRepo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := createMockClient(tt.mu, tt.validArchs, tt.netWorkErr)
+			// the bubble fails the test if GetRepo leaves goroutines blocked behind
+			synctest.Test(t, func(t *testing.T) {
+				client := createMockClient(tt.mu, tt.validArchs, tt.netWorkErr)
 
-			got, err := GetRepo(client, tt.mu)
-			assert.EqualValues(t, tt.wantErr, (err != nil))
-			assert.Equal(t, len(tt.want), len(got))
+				got, err := GetRepo(client, tt.mu)
+				assert.EqualValues(t, tt.wantErr, (err != nil))
+				assert.Equal(t, len(tt.want), len(got))
 
-			// to reliably compare expected and got  we need to sort the repos by URL,
-			// the results' starting order is influenced by goroutines scheduling
-			sort.Slice(got, func(i, j int) bool { return got[i].URL < got[j].URL })
-			for i := range tt.want {
-				wantRepo := tt.want[i]
-				gotRepo := got[i]
-				assert.Equal(t, wantRepo.URL, gotRepo.URL)
-				assert.ElementsMatch(t, wantRepo.Archs, gotRepo.Archs)
-			}
+				// to reliably compare expected and got  we need to sort the repos by URL,
+				// the results' starting order is influenced by goroutines scheduling
+				sort.Slice(got, func(i, j int) bool { return got[i].URL < got[j].URL })
+				for i := range tt.want {
+					wantRepo := tt.want[i]
+					gotRepo := got[i]
+					assert.Equal(t, wantRepo.URL, gotRepo.URL)
+					assert.ElementsMatch(t, wantRepo.Archs, gotRepo.Archs)
+				}
+			})
 		})
 	}
+}
+
+func TestRemoveOldChannels(t *testing.T) {
+	dir := t.TempDir()
+	config := Config{Storage: get.StorageConfig{Type: "file", Path: dir}}
+
+	// nothing synced yet: must not panic or fail
+	assert.NoError(t, RemoveOldChannels(config, nil))
+
+	mu := filepath.Join(dir, "ibs/SUSE:/Maintenance:/")
+	for _, id := range []string{"12345", "99999"} {
+		assert.NoError(t, os.MkdirAll(filepath.Join(mu, id, "SUSE_Updates"), 0755))
+	}
+	assert.NoError(t, RemoveOldChannels(config, []Updates{{IncidentNumber: "12345"}}))
+	assert.DirExists(t, filepath.Join(mu, "12345", "SUSE_Updates"))
+	assert.NoDirExists(t, filepath.Join(mu, "99999", "SUSE_Updates"))
 }

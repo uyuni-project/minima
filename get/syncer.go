@@ -9,9 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/url"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -153,17 +151,12 @@ func (r *Syncer) StoreRepo() (err error) {
 			return
 		}
 
-		netOpErr, ok := err.(*net.OpError)
-		if ok {
-			syscallErr, ok := netOpErr.Err.(*os.SyscallError)
-			if ok && syscallErr.Err == syscall.ECONNRESET {
-				log.Printf("Connection reset: %v. Retrying ...\n", netOpErr)
-				continue
-			}
+		if errors.Is(err, syscall.ECONNRESET) {
+			log.Printf("Connection reset: %v. Retrying ...\n", err)
+			continue
 		}
 
-		uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
-		if unexpectedStatusCode {
+		if uerr, ok := errors.AsType[*UnexpectedStatusCodeError](err); ok {
 			sc := uerr.StatusCode
 			if sc == 401 || sc == 403 || sc == 404 || sc == 410 || sc == 502 || sc == 503 || sc == 504 {
 				log.Printf("Got %v, presumably temporarily, retrying...\n", sc)
@@ -172,15 +165,13 @@ func (r *Syncer) StoreRepo() (err error) {
 			return err
 		}
 
-		_, checksumError := err.(*util.ChecksumError)
-		if checksumError {
+		if _, ok := errors.AsType[*util.ChecksumError](err); ok {
 			log.Println(err.Error())
 			log.Println("Checksum did not match, presumably the repo was published while syncing, retrying...")
 			continue
 		}
 
-		_, signatureError := err.(*SignatureError)
-		if signatureError {
+		if _, ok := errors.AsType[*SignatureError](err); ok {
 			log.Println(err.Error())
 			log.Println("Signature not valid, presumably the repo was published while syncing, retrying...")
 		} else {
@@ -369,8 +360,7 @@ func (r *Syncer) checkRepomdSignature(repomdReader io.Reader, repoType RepoType)
 }
 
 func ignoreStatusCode(err error, codes ...int) error {
-	uerr, unexpectedStatusCode := err.(*UnexpectedStatusCodeError)
-	if unexpectedStatusCode {
+	if uerr, ok := errors.AsType[*UnexpectedStatusCodeError](err); ok {
 		for _, code := range codes {
 			if uerr.StatusCode == code {
 				log.Printf("Got %d, ignoring...\n", code)

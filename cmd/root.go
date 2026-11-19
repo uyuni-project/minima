@@ -88,7 +88,7 @@ func initConfig() {
 func parseConfig(configString string) (Config, error) {
 	config := Config{}
 	if err := yaml.Unmarshal([]byte(configString), &config); err != nil {
-		return config, fmt.Errorf("configuration parse error: %v", err)
+		return config, fmt.Errorf("configuration parse error: %w", err)
 	}
 
 	storageType := config.Storage.Type
